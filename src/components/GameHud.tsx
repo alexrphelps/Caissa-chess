@@ -69,6 +69,9 @@ export interface SharedHudProps {
   onOpenGameReview?: () => void;
   onCopyFen?: () => void;
   onCopyPgn?: () => void;
+  onOpenBoardCustomizer?: () => void;
+  isCoachPanelOpen?: boolean;
+  onToggleCoachPanel?: () => void;
 }
 
 export function getStatusBannerText(
@@ -296,6 +299,9 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
   onOpenGameReview,
   onCopyFen,
   onCopyPgn,
+  onOpenBoardCustomizer,
+  isCoachPanelOpen = true,
+  onToggleCoachPanel,
 }) => {
   const [openPopover, setOpenPopover] = useState<'history' | 'options' | null>(
     null
@@ -421,11 +427,11 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
   return (
     <header
       data-testid="top-header-bar"
-      className="w-full shrink-0 bg-[#151E19] border-b border-[#293830] px-4 sm:px-6 py-2.5 z-30"
+      className="w-full shrink-0 bg-[#151E19] border-b border-[#293830] px-3 sm:px-5 py-2 z-30"
     >
-      <div className="max-w-[1440px] mx-auto flex flex-nowrap items-center justify-between gap-2.5">
-        {/* Zone 1: Brand Identity (Fixed 144px Width) */}
-        <div className="w-[144px] flex items-center shrink-0 overflow-hidden">
+      <div className="w-full max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-2">
+        {/* Zone 1: Brand Identity */}
+        <div className="min-w-[118px] max-w-[152px] flex items-center shrink-0 overflow-hidden">
           <div className="min-w-0 w-full">
             <h1
               className="text-sm sm:text-base font-bold tracking-tight text-[#F4EFE6] leading-tight whitespace-nowrap truncate"
@@ -448,10 +454,10 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
           </div>
         </div>
 
-        {/* Zone 2: Turn & Status Banner (Compact 256px Width) */}
+        {/* Zone 2: Turn & Status Banner */}
         <div
           data-testid="game-status-banner"
-          className={`w-[244px] xl:w-[264px] shrink-0 h-[46px] px-3.5 py-1.5 rounded-xl border flex items-center justify-between gap-2 transition-colors overflow-hidden ${
+          className={`flex-1 min-w-[200px] max-w-[270px] h-[44px] px-3 py-1.5 rounded-xl border flex items-center justify-between gap-2 transition-colors overflow-hidden ${
             statusInfo.tone === 'check'
               ? 'bg-[#3B1818] border-[#EF4444] text-[#FEE2E2]'
               : statusInfo.tone === 'gameover'
@@ -468,7 +474,7 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
             </p>
           </div>
 
-          <div className="w-[54px] shrink-0 text-right">
+          <div className="shrink-0 text-right">
             {isAIThinking ? (
               <span
                 data-testid="ai-thinking-indicator"
@@ -488,7 +494,7 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
         {gameMode === 'ai' && (
           <div
             data-testid="hud-difficulty-panel"
-            className="hidden lg:flex items-center justify-between gap-2 h-[46px] bg-[#121A16] border border-[#26342C] rounded-xl px-2.5 py-1.5 shrink-0"
+            className="hidden xl:flex items-center justify-between gap-2 h-[44px] bg-[#121A16] border border-[#26342C] rounded-xl px-2.5 py-1.5 shrink-0"
           >
             <div className="flex items-center gap-1 shrink-0">
               <span className="text-[10px] font-mono uppercase tracking-wider text-[#A69F91] whitespace-nowrap mr-0.5">
@@ -557,7 +563,7 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
             {showEngineStats && (
               <div
                 data-testid="engine-telemetry-bar"
-                className="hidden xl:flex items-center justify-between w-[206px] pl-2 border-l border-[#26342C] text-[11px] font-mono text-[#A69F91] tabular-nums whitespace-nowrap shrink-0"
+                className="hidden 2xl:flex items-center justify-between w-[202px] pl-2 border-l border-[#26342C] text-[11px] font-mono text-[#A69F91] tabular-nums whitespace-nowrap shrink-0"
               >
                 <span className="w-[64px] shrink-0">
                   Depth <strong className="text-[#F4EFE6]">{displayedDepth}</strong>
@@ -588,12 +594,12 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
           </div>
         )}
 
-        {/* Zone 4: Right Controls (Static-Width Moves Popover + Undo + Options Icon) */}
+        {/* Zone 4: Right Controls (Moves Popover + Undo + Puzzles + Layout + Saved + Options) */}
         <div
           ref={popoverContainerRef}
-          className="relative flex items-center gap-2 shrink-0"
+          className="relative flex flex-wrap items-center gap-1.5 max-w-full min-w-0"
         >
-          {/* Move History Popover Trigger: Fixed 168px Width so Adding Moves Never Shifts Layout */}
+          {/* Move History Popover Trigger */}
           <button
             type="button"
             data-testid="move-history-toggle"
@@ -601,7 +607,7 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
             onClick={() =>
               handleSetOpenPopover(openPopover === 'history' ? null : 'history')
             }
-            className={`w-[168px] h-[46px] px-3.5 rounded-xl border text-xs font-mono font-medium flex items-center justify-between gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`min-w-[104px] sm:min-w-[126px] max-w-[152px] sm:max-w-[168px] h-[44px] px-2.5 sm:px-3 rounded-xl border text-xs font-mono font-medium flex items-center justify-between gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
               openPopover === 'history'
                 ? 'bg-[#25352C] border-[#C6923A] text-[#F4EFE6]'
                 : 'bg-[#1D2A23] hover:bg-[#25352C] border-[#34463C] text-[#D6CFC2] hover:text-[#F4EFE6]'
@@ -634,7 +640,7 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
             </svg>
           </button>
 
-          {/* Quick Action: Undo Move (Fixed 86px Width & Extra Padding) */}
+          {/* Quick Action: Undo Move */}
           <button
             type="button"
             data-testid="quick-undo-button"
@@ -645,7 +651,7 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                 ? 'Undo Move (Cancels AI thinking) [U]'
                 : 'Undo Move [U]'
             }
-            className={`w-[86px] h-[46px] px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`h-[44px] px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
               isAIThinking && canUndo
                 ? 'bg-[#2A2318] hover:bg-[#3B2F1F] border-[#C6923A]/80 text-[#F4EFE6] shadow-[0_0_8px_rgba(198,146,58,0.25)]'
                 : 'bg-[#212E27] hover:bg-[#2C3D34] disabled:opacity-40 disabled:pointer-events-none border-[#34463C] text-[#F4EFE6]'
@@ -679,10 +685,49 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
               data-testid="hud-puzzles-btn"
               onClick={onOpenPuzzles}
               title="Tactical Puzzles (Adaptive Rush)"
-              className="h-[46px] px-3 rounded-xl border bg-[#162B21] hover:bg-[#1E3B2D] border-emerald-500/50 text-emerald-300 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 text-xs font-mono font-bold"
+              className="h-[44px] px-2.5 sm:px-3 rounded-xl border bg-[#162B21] hover:bg-[#1E3B2D] border-emerald-500/50 text-emerald-300 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 text-xs font-mono font-bold whitespace-nowrap"
             >
               <span>⚡</span>
-              <span className="hidden sm:inline">Puzzles</span>
+              <span className="hidden md:inline">Puzzles</span>
+            </button>
+          )}
+
+          {/* Restore Tactical Coach Panel Pill when Hidden (Zen Board Mode) */}
+          {!isCoachPanelOpen && onToggleCoachPanel && (
+            <button
+              type="button"
+              data-testid="hud-restore-coach-btn"
+              onClick={onToggleCoachPanel}
+              title="Show Tactical Coach Panel"
+              className="h-[44px] px-3 rounded-xl border bg-[#262015] hover:bg-[#352C1B] border-[#C6923A]/70 text-[#EADBC8] flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 text-xs font-semibold whitespace-nowrap"
+            >
+              <span>Show Coach</span>
+            </button>
+          )}
+
+          {/* Quick Action: Board & Workspace Customizer */}
+          {onOpenBoardCustomizer && (
+            <button
+              type="button"
+              data-testid="hud-board-customizer-btn"
+              aria-label="Customize Board and Layout"
+              onClick={onOpenBoardCustomizer}
+              title="Customize Board Theme, Size & Coach Layout"
+              className="w-[44px] h-[44px] rounded-xl border bg-[#212E27] hover:bg-[#2C3D34] border-[#34463C] hover:border-[#C6923A]/70 text-[#EADBC8] hover:text-[#F4EFE6] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="w-4 h-4 text-[#C6923A]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="14" y1="3" x2="14" y2="21" />
+                <line x1="3" y1="12" x2="14" y2="12" />
+              </svg>
             </button>
           )}
 
@@ -691,9 +736,10 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
             <button
               type="button"
               data-testid="hud-saved-games-btn"
+              aria-label="Saved Game Sessions"
               onClick={onOpenSavedGames}
               title="Saved Game Sessions & Slots [S]"
-              className="w-[46px] h-[46px] rounded-xl border bg-[#212E27] hover:bg-[#2C3D34] border-[#34463C] text-[#F4EFE6] flex items-center justify-center transition-colors cursor-pointer shrink-0 relative"
+              className="w-[44px] h-[44px] rounded-xl border bg-[#212E27] hover:bg-[#2C3D34] border-[#34463C] text-[#F4EFE6] flex items-center justify-center transition-colors cursor-pointer shrink-0 relative"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -724,7 +770,7 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
             onClick={() =>
               handleSetOpenPopover(openPopover === 'options' ? null : 'options')
             }
-            className={`w-[46px] h-[46px] rounded-xl border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+            className={`w-[44px] h-[44px] rounded-xl border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
               openPopover === 'options'
                 ? 'bg-[#C6923A] border-[#C6923A] text-[#111815]'
                 : 'bg-[#212E27] hover:bg-[#2C3D34] border-[#34463C] text-[#F4EFE6]'
@@ -931,6 +977,23 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
 
               {/* Section 1: Board & Match Setup */}
               <div className="space-y-1.5">
+                {onOpenBoardCustomizer && (
+                  <button
+                    type="button"
+                    data-testid="options-board-customizer-btn"
+                    onClick={() => {
+                      setOpenPopover(null);
+                      onOpenBoardCustomizer();
+                    }}
+                    className="w-full h-8 px-3 rounded-lg bg-[#242117] hover:bg-[#312C1D] border border-[#C6923A]/50 text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
+                  >
+                    <span>Board Theme & Layout Customizer</span>
+                    <span className="text-[10px] font-mono text-[#C6923A] font-bold">
+                      Customize
+                    </span>
+                  </button>
+                )}
+
                 {onOpenPuzzles && (
                   <button
                     type="button"
@@ -1232,7 +1295,7 @@ const PlayerRackSegment: React.FC<PlayerRackSegmentProps> = ({
               {label}
             </span>
             {isActiveTurn && (
-              <span className="text-[10px] font-mono uppercase tracking-wider text-[#C6923A] font-bold shrink-0">
+              <span className="hidden @[380px]/strip:inline text-[10px] font-mono uppercase tracking-wider text-[#C6923A] font-bold shrink-0">
                 · Turn
               </span>
             )}
@@ -1288,6 +1351,7 @@ export interface UnderBoardPlayerStripProps {
   engineProfile?: EngineProfileState;
   previewPly?: number | null;
   totalPlies?: number;
+  frameWidthPx?: number;
   onPreviewPly?: (ply: number | null) => void;
   onCopyFen?: () => void;
   onCopyPgn?: () => void;
@@ -1302,6 +1366,7 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
   engineProfile,
   previewPly = null,
   totalPlies = 0,
+  frameWidthPx,
   onPreviewPly,
   onCopyFen,
   onCopyPgn,
@@ -1318,17 +1383,28 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
     ? `${profileSummary.title}`
     : activeDiffInfo.name;
 
+  const isCompactStrip =
+    typeof frameWidthPx === 'number' && frameWidthPx < 460;
+
   const whiteLabel =
     gameMode === 'ai'
       ? playerColor === 'w'
-        ? 'White (You)'
+        ? isCompactStrip
+          ? 'White'
+          : 'White (You)'
+        : isCompactStrip
+        ? 'White (AI)'
         : `White (AI · ${aiBadge})`
       : 'White';
 
   const blackLabel =
     gameMode === 'ai'
       ? playerColor === 'b'
-        ? 'Black (You)'
+        ? isCompactStrip
+          ? 'Black'
+          : 'Black (You)'
+        : isCompactStrip
+        ? 'Black (AI)'
         : `Black (AI · ${aiBadge})`
       : 'Black';
 
@@ -1340,9 +1416,18 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
   return (
     <div
       data-testid="under-board-player-strip"
-      className="w-full flex flex-col gap-2 shrink-0 select-none"
+      style={
+        frameWidthPx
+          ? {
+              width: `${frameWidthPx}px`,
+              maxWidth: '100%',
+              containerType: 'inline-size',
+            }
+          : { containerType: 'inline-size' }
+      }
+      className="@container/strip w-full flex flex-col gap-2 shrink-0 select-none"
     >
-      <div className="w-full grid grid-cols-2 gap-2.5">
+      <div className="w-full grid grid-cols-1 @[340px]/strip:grid-cols-2 gap-2">
         <PlayerRackSegment
           color="w"
           label={whiteLabel}
@@ -1371,7 +1456,7 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
       {/* Under-Board Move Scrubbing & FEN Export Toolbar */}
       <div
         data-testid="under-board-playback-toolbar"
-        className="h-9 px-3 rounded-lg bg-[#141E19] border border-[#26372E] flex items-center justify-between gap-2 text-xs font-mono"
+        className="min-h-9 px-2.5 py-1 rounded-lg bg-[#141E19] border border-[#26372E] flex flex-wrap items-center justify-between gap-1.5 text-xs font-mono"
       >
         {/* Playback Scrubbing Controls */}
         <div className="flex items-center gap-1">
@@ -1428,39 +1513,45 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
         </div>
 
         {/* Current Status / Ply Indicator */}
-        <div className="flex items-center gap-2 text-[11px] truncate">
+        <div className="flex items-center gap-1.5 text-[11px] min-w-0 truncate tabular-nums">
           {isScrubbing ? (
             <div className="flex items-center gap-1.5">
               <span className="text-[#C6923A] font-bold">
-                Reviewing Ply {previewPly} / {totalPlies}
+                Ply {previewPly}/{totalPlies}
               </span>
               <button
                 type="button"
                 onClick={() => onPreviewPly?.(null)}
                 className="px-1.5 py-0.5 rounded bg-[#C6923A]/20 hover:bg-[#C6923A]/30 text-[#C6923A] text-[10px] uppercase font-bold cursor-pointer"
               >
-                Return to Live
+                Live
               </button>
             </div>
           ) : (
-            <span className="text-[#857F72]">
-              Live Board · Move {gameState.fullMoveNumber} ({totalPlies} {totalPlies === 1 ? 'ply' : 'plies'})
+            <span className="text-[#857F72] truncate">
+              <span className="hidden @[490px]/strip:inline">
+                Live Board · Move {gameState.fullMoveNumber} ({totalPlies}{' '}
+                {totalPlies === 1 ? 'ply' : 'plies'})
+              </span>
+              <span className="@[490px]/strip:hidden">
+                Move {gameState.fullMoveNumber} ({totalPlies}p)
+              </span>
             </span>
           )}
         </div>
 
         {/* Action Buttons: FEN, PGN, Review */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           {onCopyFen && (
             <button
               type="button"
               data-testid="strip-copy-fen-btn"
               title="Copy current board position as FEN string"
               onClick={onCopyFen}
-              className="px-2 py-1 rounded bg-[#1C2822] hover:bg-[#283830] border border-[#34463C] text-[11px] font-mono text-[#D6CFC2] hover:text-[#F4EFE6] flex items-center gap-1 transition-colors cursor-pointer"
+              className="px-1.5 @[420px]/strip:px-2 py-1 rounded bg-[#1C2822] hover:bg-[#283830] border border-[#34463C] text-[11px] font-mono text-[#D6CFC2] hover:text-[#F4EFE6] flex items-center gap-1 transition-colors cursor-pointer"
             >
               <span className="text-[#C6923A]">📋</span>
-              <span className="hidden sm:inline">FEN</span>
+              <span className="hidden @[420px]/strip:inline">FEN</span>
             </button>
           )}
 
@@ -1470,10 +1561,10 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
               data-testid="strip-copy-pgn-btn"
               title="Copy match notation as PGN string"
               onClick={onCopyPgn}
-              className="px-2 py-1 rounded bg-[#1C2822] hover:bg-[#283830] border border-[#34463C] text-[11px] font-mono text-[#D6CFC2] hover:text-[#F4EFE6] flex items-center gap-1 transition-colors cursor-pointer"
+              className="px-1.5 @[420px]/strip:px-2 py-1 rounded bg-[#1C2822] hover:bg-[#283830] border border-[#34463C] text-[11px] font-mono text-[#D6CFC2] hover:text-[#F4EFE6] flex items-center gap-1 transition-colors cursor-pointer"
             >
               <span className="text-[#C6923A]">📜</span>
-              <span className="hidden sm:inline">PGN</span>
+              <span className="hidden @[420px]/strip:inline">PGN</span>
             </button>
           )}
 
@@ -1483,10 +1574,10 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
               data-testid="strip-review-btn"
               title="Open full game review & move accuracy breakdown"
               onClick={onOpenGameReview}
-              className="px-2.5 py-1 rounded bg-[#162B21] hover:bg-[#1E3B2D] border border-emerald-500/50 text-[11px] font-bold font-mono text-emerald-300 hover:text-emerald-200 flex items-center gap-1 transition-colors cursor-pointer"
+              className="px-2 @[420px]/strip:px-2.5 py-1 rounded bg-[#162B21] hover:bg-[#1E3B2D] border border-emerald-500/50 text-[11px] font-bold font-mono text-emerald-300 hover:text-emerald-200 flex items-center gap-1 transition-colors cursor-pointer"
             >
               <span>📊</span>
-              <span>Review</span>
+              <span className="hidden @[360px]/strip:inline">Review</span>
             </button>
           )}
         </div>
@@ -1514,10 +1605,13 @@ export const TacticalCoachPanel: React.FC<{
   openingPrinciplesReport?: OpeningPrinciplesReport;
   highlightedHelperRank: 1 | 2 | 3 | null;
   playerColor?: Color;
+  panelWidthPx?: number;
+  isDesktopSplit?: boolean;
   onToggleHelperMode: () => void;
   onToggleBoardSuggestions: () => void;
   onHoverHelperRank: (rank: 1 | 2 | 3 | null) => void;
   onPlayRecommendedMove: (rec: RecommendedMove) => void;
+  onHidePanel?: () => void;
 }> = ({
   gameState,
   helperMode,
@@ -1527,10 +1621,13 @@ export const TacticalCoachPanel: React.FC<{
   openingPrinciplesReport,
   highlightedHelperRank,
   playerColor = 'w',
+  panelWidthPx,
+  isDesktopSplit = false,
   onToggleHelperMode,
   onToggleBoardSuggestions,
   onHoverHelperRank,
   onPlayRecommendedMove,
+  onHidePanel,
 }) => {
   const [activeTab, setActiveTab] = useState<'tactics' | 'principles' | 'opening'>('tactics');
 
@@ -1560,13 +1657,25 @@ export const TacticalCoachPanel: React.FC<{
   return (
     <aside
       data-testid="helper-mode-panel"
-      className="flex-1 w-full lg:max-w-[540px] xl:max-w-[580px] min-h-0 flex flex-col bg-[#16201B] border border-[#2C3A33] rounded-xl p-4 sm:p-5 shadow-[0_16px_40px_rgba(0,0,0,0.45)] gap-3 overflow-y-auto"
+      data-panel-width={panelWidthPx ?? undefined}
+      style={{
+        containerType: 'inline-size',
+        ...(isDesktopSplit && panelWidthPx
+          ? {
+              width: `${panelWidthPx}px`,
+              flex: `0 0 ${panelWidthPx}px`,
+            }
+          : {}),
+      }}
+      className={`@container/coach w-full min-w-0 min-h-0 flex flex-col bg-[#16201B] border border-[#2C3A33] rounded-xl p-3.5 @[420px]/coach:p-4 @[520px]/coach:p-5 shadow-[0_16px_40px_rgba(0,0,0,0.45)] gap-2.5 @[420px]/coach:gap-3 overflow-y-auto overflow-x-hidden ${
+        isDesktopSplit ? 'h-full' : ''
+      }`}
     >
       {/* Top Row: Coach Title, Deep Engine Badge & Helper Mode + Board Suggestions Switches */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#26342C] pb-2.5 shrink-0">
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
           <h2
-            className="text-base sm:text-lg font-bold tracking-tight text-[#F4EFE6] whitespace-nowrap"
+            className="text-base @[420px]/coach:text-lg font-bold tracking-tight text-[#F4EFE6] whitespace-nowrap"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             Tactical Coach
@@ -1582,20 +1691,20 @@ export const TacticalCoachPanel: React.FC<{
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
           <button
             type="button"
             role="switch"
             aria-checked={helperMode}
             data-testid="helper-mode-toggle"
             onClick={onToggleHelperMode}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 border ${
+            className={`px-2 py-1 rounded-lg text-[11px] font-mono font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 border ${
               helperMode
                 ? 'bg-[#16A34A]/20 border-[#22C55E] text-[#4ADE80]'
                 : 'bg-[#1D2822] border-[#34463C] text-[#A69F91] hover:text-[#F4EFE6]'
             }`}
           >
-            Helper Mode: {helperMode ? 'ON' : 'OFF'}
+            Helper: {helperMode ? 'ON' : 'OFF'}
           </button>
 
           <button
@@ -1605,7 +1714,7 @@ export const TacticalCoachPanel: React.FC<{
             data-testid="board-suggestions-toggle"
             onClick={onToggleBoardSuggestions}
             title="Show or hide move suggestion arrows and badges on the chessboard"
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 border ${
+            className={`px-2 py-1 rounded-lg text-[11px] font-mono font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 border ${
               !helperMode
                 ? 'bg-[#17201B] border-[#26342C] text-[#6E6A5F]'
                 : showBoardSuggestions
@@ -1613,35 +1722,58 @@ export const TacticalCoachPanel: React.FC<{
                 : 'bg-[#1D2822] border-[#34463C] text-[#A69F91] hover:text-[#F4EFE6]'
             }`}
           >
-            Board Suggestions: {showBoardSuggestions ? 'ON' : 'OFF'}
+            Arrows: {showBoardSuggestions ? 'ON' : 'OFF'}
           </button>
+
+          {onHidePanel && (
+            <button
+              type="button"
+              data-testid="hide-coach-panel-btn"
+              aria-label="Hide Tactical Coach panel to maximize chessboard"
+              title="Hide Coach Panel (Maximize Chessboard)"
+              onClick={onHidePanel}
+              className="w-7 h-7 rounded-lg bg-[#1D2822] hover:bg-[#27362E] border border-[#34463C] text-[#A69F91] hover:text-[#F4EFE6] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="w-3.5 h-3.5"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Turn Delta + Live Opponent Threat Predictor Strip */}
       <div
         data-testid="coach-what-changed-banner"
-        className="bg-[#121A16] border border-[#26342C] rounded-xl px-3.5 py-2 shrink-0 space-y-1"
+        className="bg-[#121A16] border border-[#26342C] rounded-xl px-3 py-2 shrink-0 space-y-1 min-w-0"
       >
-        <div className="flex items-center justify-between gap-2 text-xs font-mono">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-xs font-mono">
           <span className="font-bold text-[#C6923A]">{turnDelta.badge}</span>
-          <span className="text-[#857F72] tabular-nums">
+          <span className="text-[11px] text-[#857F72] tabular-nums">
             {helperMode && displayAnalysis
               ? `${displayAnalysis.evalBreakdown.phaseLabel} · ${displayAnalysis.searchNodes.toLocaleString()}n (${displayAnalysis.ttHits.toLocaleString()} TT)`
               : 'What Changed This Turn'}
           </span>
         </div>
-        <p className="text-xs sm:text-sm font-semibold text-[#F4EFE6] leading-snug">
+        <p className="text-xs @[420px]/coach:text-sm font-semibold text-[#F4EFE6] leading-snug break-words">
           {turnDelta.summary}
         </p>
         {helperMode && opponentThreat ? (
           <div
             data-testid="coach-opponent-threat"
             data-threat-severity={opponentThreat.severity}
-            className="flex items-center justify-between gap-2 pt-0.5 text-xs font-mono"
+            className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 pt-0.5 text-xs font-mono"
           >
             <span
-              className={`truncate font-semibold ${
+              className={`min-w-0 break-words font-semibold ${
                 opponentThreat.severity === 'critical'
                   ? 'text-[#F87171]'
                   : opponentThreat.severity === 'high'
@@ -1665,7 +1797,7 @@ export const TacticalCoachPanel: React.FC<{
             </span>
           </div>
         ) : (
-          <p className="text-xs text-[#A69F91] leading-snug">
+          <p className="text-xs text-[#A69F91] leading-snug break-words">
             {turnDelta.detail}
           </p>
         )}
@@ -1683,19 +1815,19 @@ export const TacticalCoachPanel: React.FC<{
           aria-selected={activeTab === 'tactics'}
           data-testid="coach-tab-tactics"
           onClick={() => setActiveTab('tactics')}
-          className={`py-2 px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap ${
+          className={`py-1.5 px-1.5 @[520px]/coach:py-2 @[520px]/coach:px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex flex-col @[520px]/coach:flex-row items-center justify-center gap-0.5 @[520px]/coach:gap-1 min-w-0 ${
             activeTab === 'tactics'
               ? 'bg-[#C6923A] text-[#111815] font-bold shadow-xs'
               : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#1B2721]'
           }`}
         >
-          <span>Tactics</span>
+          <span className="whitespace-nowrap">Tactics</span>
           <span
-            className={`text-[10px] font-mono ${
+            className={`text-[10px] font-mono whitespace-nowrap ${
               activeTab === 'tactics' ? 'text-[#111815]/80' : 'text-[#857F72]'
             }`}
           >
-            · Top 3
+            <span className="hidden @[520px]/coach:inline">· </span>Top 3
           </span>
         </button>
 
@@ -1705,21 +1837,22 @@ export const TacticalCoachPanel: React.FC<{
           aria-selected={activeTab === 'principles'}
           data-testid="coach-tab-principles"
           onClick={() => setActiveTab('principles')}
-          className={`py-2 px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap ${
+          className={`py-1.5 px-1.5 @[520px]/coach:py-2 @[520px]/coach:px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex flex-col @[520px]/coach:flex-row items-center justify-center gap-0.5 @[520px]/coach:gap-1 min-w-0 ${
             activeTab === 'principles'
               ? 'bg-[#C6923A] text-[#111815] font-bold shadow-xs'
               : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#1B2721]'
           }`}
         >
-          <span>Principles</span>
+          <span className="whitespace-nowrap">Principles</span>
           <span
-            className={`text-[10px] font-mono font-bold ${
+            className={`text-[10px] font-mono font-bold truncate max-w-full ${
               activeTab === 'principles'
                 ? 'text-[#111815]/90'
                 : 'text-[#22C55E]'
             }`}
           >
-            · {openingPrinciplesReport?.grade ?? 'Guide'}
+            <span className="hidden @[520px]/coach:inline">· </span>
+            {openingPrinciplesReport?.grade ?? 'Guide'}
           </span>
         </button>
 
@@ -1729,25 +1862,26 @@ export const TacticalCoachPanel: React.FC<{
           aria-selected={activeTab === 'opening'}
           data-testid="coach-tab-opening"
           onClick={() => setActiveTab('opening')}
-          className={`py-2 px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap ${
+          className={`py-1.5 px-1.5 @[520px]/coach:py-2 @[520px]/coach:px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex flex-col @[520px]/coach:flex-row items-center justify-center gap-0.5 @[520px]/coach:gap-1 min-w-0 ${
             activeTab === 'opening'
               ? 'bg-[#C6923A] text-[#111815] font-bold shadow-xs'
               : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#1B2721]'
           }`}
         >
-          <span>ECO Book</span>
+          <span className="whitespace-nowrap">ECO Book</span>
           <span
-            className={`text-[10px] font-mono ${
+            className={`text-[10px] font-mono whitespace-nowrap ${
               activeTab === 'opening' ? 'text-[#111815]/80' : 'text-[#857F72]'
             }`}
           >
-            · {openingAnalysis.eco}
+            <span className="hidden @[520px]/coach:inline">· </span>
+            {openingAnalysis.eco}
           </span>
         </button>
       </div>
 
       {!helperMode ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-[#121A16] border border-[#24332B] rounded-xl space-y-3">
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-5 bg-[#121A16] border border-[#24332B] rounded-xl space-y-3">
           <p className="text-sm font-semibold text-[#F4EFE6]">
             Helper Mode is Currently Off
           </p>
@@ -1779,15 +1913,18 @@ export const TacticalCoachPanel: React.FC<{
               type="button"
               data-testid="coach-opening-milestone-pill"
               onClick={() => setActiveTab('principles')}
-              className="w-full px-3 py-1.5 rounded-lg bg-[#141D18] hover:bg-[#1A2620] border border-[#273B2F] flex items-center justify-between text-xs transition-colors cursor-pointer shrink-0"
+              className="w-full px-3 py-1.5 rounded-lg bg-[#141D18] hover:bg-[#1A2620] border border-[#273B2F] flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs transition-colors cursor-pointer shrink-0 text-left"
             >
-              <div className="flex items-center gap-2">
-                <span className="text-[#C6923A] text-xs font-bold">♔ Opening Milestone:</span>
-                <span className="font-mono text-emerald-400 font-bold">
-                  Grade {openingPrinciplesReport.grade} ({openingPrinciplesReport.overallScore}%)
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="text-[#C6923A] text-xs font-bold">
+                  ♔ Opening Milestone:
+                </span>
+                <span className="font-mono text-emerald-400 font-bold tabular-nums">
+                  Grade {openingPrinciplesReport.grade} (
+                  {openingPrinciplesReport.overallScore}%)
                 </span>
               </div>
-              <span className="text-xs text-[#C6923A] font-semibold hover:underline">
+              <span className="text-xs text-[#C6923A] font-semibold hover:underline shrink-0">
                 Milestones →
               </span>
             </button>
@@ -1795,9 +1932,9 @@ export const TacticalCoachPanel: React.FC<{
 
           {/* Section A: At a Glance — Top 3 Recommended Moves with Deep Eval & Win% */}
           <div className="space-y-1.5 shrink-0">
-            <div className="flex items-center justify-between text-[11px] font-mono text-[#A69F91]">
-              <span>MULTI-PV CANDIDATE MOVES (EVAL · WIN%)</span>
-              <span>Hover to preview · Click to play</span>
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px] font-mono text-[#A69F91]">
+              <span>MULTI-PV CANDIDATES (EVAL · WIN%)</span>
+              <span className="text-[#857F72]">Hover preview · Click play</span>
             </div>
 
             <div
@@ -1826,7 +1963,7 @@ export const TacticalCoachPanel: React.FC<{
                     <div
                       key={`empty-slot-${rank}`}
                       data-testid={`helper-empty-slot-${rank}`}
-                      className="py-2 px-3.5 rounded-xl bg-[#121A16]/60 border border-[#223028] flex items-center text-xs font-mono text-[#6E6A5F]"
+                      className="py-2 px-3 rounded-xl bg-[#121A16]/60 border border-[#223028] flex items-center text-xs font-mono text-[#6E6A5F]"
                     >
                       {hasMateInOne && rank === 2
                         ? '#2 — Forced Checkmate in 1 Found Above (#1)'
@@ -1856,13 +1993,13 @@ export const TacticalCoachPanel: React.FC<{
                     onClick={() => {
                       if (helperAnalysis) onPlayRecommendedMove(rec);
                     }}
-                    className={`w-full text-left py-2 px-3.5 rounded-xl flex items-center justify-between gap-2.5 transition-colors cursor-pointer border ${
+                    className={`w-full text-left py-2 px-3 rounded-xl flex flex-wrap items-center justify-between gap-x-2 gap-y-1 transition-colors cursor-pointer border ${
                       isHighlighted
                         ? 'bg-[#1F2E26] border-[#C6923A] shadow-xs'
                         : 'bg-[#121A16] border-[#24332B] hover:border-[#3A5044]'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 min-w-0 flex-1">
                       <span
                         className={`text-xs font-mono font-bold shrink-0 ${rankColor}`}
                       >
@@ -1877,11 +2014,11 @@ export const TacticalCoachPanel: React.FC<{
                       >
                         ·
                       </span>
-                      <span className="text-xs sm:text-sm text-[#D6CFC2] font-medium truncate">
+                      <span className="text-xs @[420px]/coach:text-sm text-[#D6CFC2] font-medium break-words">
                         {rec.headline}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 font-mono text-xs tabular-nums">
+                    <div className="flex items-center gap-2 shrink-0 font-mono text-xs tabular-nums ml-auto">
                       <span
                         data-testid={`helper-rec-eval-${rec.rank}`}
                         className={`font-bold ${evalColor}`}
@@ -1902,22 +2039,23 @@ export const TacticalCoachPanel: React.FC<{
           {/* Section B: Pause & Learn — Deep-Dive Tactical & Principal Variation Breakdown */}
           <div
             data-testid="coach-commentary-box"
-            className="flex-1 min-h-0 p-3.5 rounded-xl bg-[#121A16] border border-[#26362E] flex flex-col justify-between gap-2"
+            className="flex-1 min-h-0 p-3 @[420px]/coach:p-3.5 rounded-xl bg-[#121A16] border border-[#26362E] flex flex-col justify-between gap-2.5 min-w-0"
           >
             {activeCoachRec ? (
               <>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2 border-b border-[#223028] pb-1.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#C6923A] truncate">
+                <div className="space-y-2 min-w-0">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-[#223028] pb-1.5">
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
+                      <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#C6923A]">
                         Move #{activeCoachRec.rank} ({activeCoachRec.san})
                       </span>
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-[#4ADE80] shrink-0">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-[#4ADE80]">
                         · {activeCoachRec.tacticalMotif}
                       </span>
                     </div>
                     <span className="text-xs font-mono text-[#A69F91] tabular-nums shrink-0">
-                      Eval {activeCoachRec.formattedEval} · {activeCoachRec.winProb}% Win
+                      Eval {activeCoachRec.formattedEval} ·{' '}
+                      {activeCoachRec.winProb}% Win
                     </span>
                   </div>
 
@@ -1926,39 +2064,42 @@ export const TacticalCoachPanel: React.FC<{
                     <span className="text-[11px] font-mono uppercase tracking-wider text-[#857F72]">
                       Why This Move Works
                     </span>
-                    <p className="text-xs sm:text-sm leading-snug text-[#F4EFE6] font-medium">
+                    <p className="text-xs @[420px]/coach:text-sm leading-snug text-[#F4EFE6] font-medium break-words">
                       {activeCoachRec.coachWhy}
                     </p>
                   </div>
 
                   {/* Next-Turn Follow-Up & Principal Variation Line */}
                   <div className="space-y-0.5">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
                       <span className="text-[11px] font-mono uppercase tracking-wider text-[#857F72]">
                         Principal Variation & Follow-Up Plan
                       </span>
                       {activeCoachRec.pvFormatted && (
                         <span
                           data-testid="coach-pv-line"
-                          className="text-[11px] font-mono text-[#C6923A] truncate tabular-nums"
+                          className="text-[11px] font-mono text-[#C6923A] break-words tabular-nums"
                         >
                           PV: {activeCoachRec.pvFormatted}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs sm:text-sm leading-snug text-[#D6CFC2]">
+                    <p className="text-xs @[420px]/coach:text-sm leading-snug text-[#D6CFC2] break-words">
                       {activeCoachRec.followUpPlan}
                     </p>
                   </div>
 
-                  {/* 3-Step Visual Calculation Sequence */}
+                  {/* 3-Step Visual Calculation Sequence — Auto-reflows 3 -> 2+1 -> 1 column */}
                   {activeCoachRec.opponentReply && (
-                    <div className="grid grid-cols-3 gap-2 pt-0.5">
-                      <div className="p-2 rounded-lg bg-[#17211C] border border-[#26342C] flex flex-col gap-0.5">
+                    <div
+                      data-testid="coach-sequence-grid"
+                      className="grid grid-cols-[repeat(auto-fit,minmax(112px,1fr))] gap-2 pt-0.5"
+                    >
+                      <div className="p-2 rounded-lg bg-[#17211C] border border-[#26342C] flex flex-col gap-0.5 min-w-0">
                         <span className="text-[10px] font-mono uppercase text-[#22C55E]">
                           1. Your Move
                         </span>
-                        <span className="text-xs sm:text-sm font-mono font-bold text-[#F4EFE6] tabular-nums">
+                        <span className="text-xs @[420px]/coach:text-sm font-mono font-bold text-[#F4EFE6] tabular-nums truncate">
                           {activeCoachRec.san}
                         </span>
                         <span className="text-[11px] font-mono text-[#857F72] tabular-nums">
@@ -1966,11 +2107,11 @@ export const TacticalCoachPanel: React.FC<{
                         </span>
                       </div>
 
-                      <div className="p-2 rounded-lg bg-[#17211C] border border-[#26342C] flex flex-col gap-0.5">
+                      <div className="p-2 rounded-lg bg-[#17211C] border border-[#26342C] flex flex-col gap-0.5 min-w-0">
                         <span className="text-[10px] font-mono uppercase text-[#F59E0B]">
                           2. Best Reply
                         </span>
-                        <span className="text-xs sm:text-sm font-mono font-bold text-[#F4EFE6] tabular-nums">
+                        <span className="text-xs @[420px]/coach:text-sm font-mono font-bold text-[#F4EFE6] tabular-nums truncate">
                           ...{activeCoachRec.opponentReply.san}
                         </span>
                         <span className="text-[11px] font-mono text-[#857F72] tabular-nums">
@@ -1979,11 +2120,11 @@ export const TacticalCoachPanel: React.FC<{
                         </span>
                       </div>
 
-                      <div className="p-2 rounded-lg bg-[#17211C] border border-[#26342C] flex flex-col gap-0.5">
+                      <div className="p-2 rounded-lg bg-[#17211C] border border-[#26342C] flex flex-col gap-0.5 min-w-0">
                         <span className="text-[10px] font-mono uppercase text-[#60A5FA]">
                           3. Follow-Up
                         </span>
-                        <span className="text-xs sm:text-sm font-mono font-bold text-[#F4EFE6] tabular-nums">
+                        <span className="text-xs @[420px]/coach:text-sm font-mono font-bold text-[#F4EFE6] tabular-nums truncate">
                           {activeCoachRec.playerFollowUp
                             ? activeCoachRec.playerFollowUp.san
                             : 'Consolidate'}
@@ -1999,19 +2140,19 @@ export const TacticalCoachPanel: React.FC<{
                 </div>
 
                 {/* Tapered Evaluation Breakdown + Piece Safety Audit & Opening Link */}
-                <div className="space-y-1.5 pt-1.5 border-t border-[#223028]">
+                <div className="space-y-1.5 pt-1.5 border-t border-[#223028] min-w-0">
                   {breakdown && (
                     <div
                       data-testid="coach-tapered-breakdown"
-                      className="grid grid-cols-4 gap-1.5 text-[11px] font-mono tabular-nums"
+                      className="grid grid-cols-[repeat(auto-fit,minmax(88px,1fr))] gap-1.5 text-[11px] font-mono tabular-nums"
                     >
-                      <div className="px-2 py-1 rounded bg-[#17211C] border border-[#24332B] flex items-center justify-between">
+                      <div className="px-2 py-1 rounded bg-[#17211C] border border-[#24332B] flex items-center justify-between gap-1">
                         <span className="text-[#857F72]">Mat</span>
                         <span className="text-[#F4EFE6] font-semibold">
                           {formatSignedPawns(breakdown.material)}
                         </span>
                       </div>
-                      <div className="px-2 py-1 rounded bg-[#17211C] border border-[#24332B] flex items-center justify-between">
+                      <div className="px-2 py-1 rounded bg-[#17211C] border border-[#24332B] flex items-center justify-between gap-1">
                         <span className="text-[#857F72]">Act</span>
                         <span className="text-[#F4EFE6] font-semibold">
                           {formatSignedPawns(
@@ -2019,13 +2160,13 @@ export const TacticalCoachPanel: React.FC<{
                           )}
                         </span>
                       </div>
-                      <div className="px-2 py-1 rounded bg-[#17211C] border border-[#24332B] flex items-center justify-between">
+                      <div className="px-2 py-1 rounded bg-[#17211C] border border-[#24332B] flex items-center justify-between gap-1">
                         <span className="text-[#857F72]">Pawn</span>
                         <span className="text-[#F4EFE6] font-semibold">
                           {formatSignedPawns(breakdown.pawnStructure)}
                         </span>
                       </div>
-                      <div className="px-2 py-1 rounded bg-[#17211C] border border-[#24332B] flex items-center justify-between">
+                      <div className="px-2 py-1 rounded bg-[#17211C] border border-[#24332B] flex items-center justify-between gap-1">
                         <span className="text-[#857F72]">King</span>
                         <span className="text-[#F4EFE6] font-semibold">
                           {formatSignedPawns(breakdown.kingSafety)}
@@ -2034,10 +2175,10 @@ export const TacticalCoachPanel: React.FC<{
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between gap-2 text-xs font-mono">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-xs font-mono">
                     <span className="text-[#857F72]">Board Safety Audit:</span>
                     {criticalThreats.length > 0 ? (
-                      <span className="text-[#F87171] font-semibold truncate">
+                      <span className="text-[#F87171] font-semibold break-words">
                         Hanging:{' '}
                         {criticalThreats
                           .map(
@@ -2046,7 +2187,7 @@ export const TacticalCoachPanel: React.FC<{
                           .join(', ')}
                       </span>
                     ) : highThreats.length > 0 ? (
-                      <span className="text-[#FB923C] font-semibold truncate">
+                      <span className="text-[#FB923C] font-semibold break-words">
                         Exchange Risk:{' '}
                         {highThreats
                           .map(
@@ -2061,8 +2202,8 @@ export const TacticalCoachPanel: React.FC<{
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="text-[#A69F91] truncate">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs">
+                    <span className="text-[#A69F91] min-w-0 break-words">
                       Opening:{' '}
                       <strong className="text-[#D6CFC2]">
                         {openingAnalysis.fullTitle}
@@ -2101,7 +2242,7 @@ export const TacticalCoachPanel: React.FC<{
             </div>
           )}
 
-          <div className="p-3 rounded-xl bg-[#121A16] border border-[#24332B] flex items-center justify-between gap-2 text-xs">
+          <div className="p-3 rounded-xl bg-[#121A16] border border-[#24332B] flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="text-[#A69F91]">Looking for tactical advice?</span>
             <button
               type="button"
@@ -2124,7 +2265,7 @@ export const TacticalCoachPanel: React.FC<{
           <div className="space-y-3">
             {/* Card 1: Opening Title, ECO Code & Variation Line */}
             <div className="p-3.5 rounded-xl bg-[#121A16] border border-[#26362E] space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
                 <span className="text-[11px] font-mono uppercase tracking-wider text-[#A69F91]">
                   {isMiddlegamePhase
                     ? 'Middlegame Strategic Transition'
@@ -2146,14 +2287,14 @@ export const TacticalCoachPanel: React.FC<{
 
               <h3
                 data-testid="opening-coach-title"
-                className="text-base sm:text-lg font-bold text-[#F4EFE6] leading-snug"
+                className="text-base @[420px]/coach:text-lg font-bold text-[#F4EFE6] leading-snug break-words"
               >
                 {openingAnalysis.fullTitle}
               </h3>
 
               <div
                 data-testid="opening-coach-variation"
-                className="text-xs sm:text-sm font-mono text-[#C6BFA8] leading-relaxed pt-1 border-t border-[#223028]"
+                className="text-xs @[420px]/coach:text-sm font-mono text-[#C6BFA8] leading-relaxed pt-1 border-t border-[#223028] break-words"
               >
                 {openingAnalysis.variation}
               </div>
@@ -2168,7 +2309,7 @@ export const TacticalCoachPanel: React.FC<{
               </span>
               <p
                 data-testid="opening-coach-strengths"
-                className="text-xs sm:text-sm leading-relaxed text-[#F4EFE6] font-medium"
+                className="text-xs @[420px]/coach:text-sm leading-relaxed text-[#F4EFE6] font-medium break-words"
               >
                 {openingAnalysis.strengths}
               </p>
@@ -2181,18 +2322,18 @@ export const TacticalCoachPanel: React.FC<{
               </span>
               <p
                 data-testid="opening-coach-commentary"
-                className="text-xs sm:text-sm leading-relaxed text-[#D6CFC2]"
+                className="text-xs @[420px]/coach:text-sm leading-relaxed text-[#D6CFC2] break-words"
               >
                 {openingAnalysis.commentary}
               </p>
             </div>
 
-            {/* Card 4: Classical Opening & Middlegame Principles Guide */}
+            {/* Card 4: Classical Opening & Middlegame Principles Guide — Auto-reflows to new lines */}
             <div className="p-3.5 rounded-xl bg-[#121A16] border border-[#26362E] space-y-1.5">
               <span className="text-[11px] font-mono uppercase tracking-wider text-[#857F72] font-semibold">
                 Classical Study Principles
               </span>
-              <div className="grid grid-cols-3 gap-2 text-xs font-mono">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(124px,1fr))] gap-2 text-xs font-mono">
                 <div className="p-2 rounded bg-[#17211C] border border-[#24332B]">
                   <div className="text-[#C6923A] font-bold">01. Center</div>
                   <div className="text-[11px] text-[#A69F91] mt-0.5 leading-snug">
@@ -2216,7 +2357,7 @@ export const TacticalCoachPanel: React.FC<{
           </div>
 
           {/* Footer: Quick Switch Back to Live Tactics */}
-          <div className="p-3 rounded-xl bg-[#121A16] border border-[#24332B] flex items-center justify-between gap-2 text-xs">
+          <div className="p-3 rounded-xl bg-[#121A16] border border-[#24332B] flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="text-[#A69F91]">
               Ready to calculate your next move?
             </span>

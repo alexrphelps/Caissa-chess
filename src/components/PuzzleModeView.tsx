@@ -38,6 +38,11 @@ import {
 } from '../chess/puzzles/types';
 import { Color, GameState, Move, PlannedArrow, PromotionPieceType, Square } from '../chess/types';
 import { soundFX } from '../utils/sound';
+import {
+  computeBoardGridSize,
+  DEFAULT_UI_LAYOUT_PREFERENCES,
+  UILayoutPreferences,
+} from '../utils/layoutMath';
 import { ChessBoard } from './ChessBoard';
 import { PastPuzzlesModal } from './PastPuzzlesModal';
 import {
@@ -50,6 +55,7 @@ import {
   Play,
   RefreshCw,
   RotateCcw,
+  SlidersHorizontal,
   Sparkles,
   Trophy,
   Volume2,
@@ -62,6 +68,9 @@ interface PuzzleModeViewProps {
   onExit: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
+  uiPrefs?: UILayoutPreferences;
+  onUpdateUiPrefs?: (patch: Partial<UILayoutPreferences>, persist?: boolean) => void;
+  onOpenBoardCustomizer?: () => void;
 }
 
 const SETUP_MOVE_DELAY_MS = 400;
@@ -71,7 +80,103 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
   onExit,
   isMuted,
   onToggleMute,
+  uiPrefs = DEFAULT_UI_LAYOUT_PREFERENCES,
+  onUpdateUiPrefs,
+  onOpenBoardCustomizer,
 }) => {
+  // Responsive arena measurement for Puzzle Mode board auto-fit
+  const puzzleArenaRef = useRef<HTMLElement | null>(null);
+  const [puzzleArenaSize, setPuzzleArenaSize] = useState<{
+    width: number;
+    height: number;
+  }>(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1440,
+    height:
+      typeof window !== 'undefined'
+        ? Math.max(420, window.innerHeight - 60)
+        : 840,
+  }));
+  const [puzzleViewport, setPuzzleViewport] = useState<{
+    width: number;
+    height: number;
+  }>(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1440,
+    height: typeof window !== 'undefined' ? window.innerHeight : 900,
+  }));
+
+  useEffect(() => {
+    const syncViewport = () => {
+      setPuzzleViewport({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    window.addEventListener('resize', syncViewport);
+    return () => window.removeEventListener('resize', syncViewport);
+  }, []);
+
+  useEffect(() => {
+    const node = puzzleArenaRef.current;
+    if (!node) return;
+    const measure = () => {
+      const rect = node.getBoundingClientRect();
+      const style = window.getComputedStyle(node);
+      const padX =
+        (parseFloat(style.paddingLeft) || 0) +
+        (parseFloat(style.paddingRight) || 0);
+      const padY =
+        (parseFloat(style.paddingTop) || 0) +
+        (parseFloat(style.paddingBottom) || 0);
+      const nextWidth = Math.max(300, Math.floor(rect.width - padX));
+      const remainingViewportH = Math.max(
+        340,
+        Math.floor(window.innerHeight - rect.top - padY)
+      );
+      const boxInnerH = Math.max(340, Math.floor(rect.height - padY));
+      const nextHeight =
+        window.innerWidth >= 1024 && window.innerHeight >= 540
+          ? Math.min(boxInnerH, remainingViewportH)
+          : remainingViewportH;
+      setPuzzleArenaSize((prev) =>
+        prev.width === nextWidth && prev.height === nextHeight
+          ? prev
+          : { width: nextWidth, height: nextHeight }
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(node);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
+  const isPuzzleDesktopSplit = puzzleViewport.width >= 1024;
+  const lockPuzzleViewport = isPuzzleDesktopSplit && puzzleViewport.height >= 540;
+
+  const puzzleBoardGeometry = useMemo(() => {
+    const rightSidebarWidth = isPuzzleDesktopSplit ? 420 : 0;
+    const gapWidth = isPuzzleDesktopSplit ? 24 : 0;
+    const availW = Math.max(320, puzzleArenaSize.width - rightSidebarWidth - gapWidth);
+    return computeBoardGridSize({
+      availableWidth: availW,
+      availableHeight: puzzleArenaSize.height,
+      boardScale: uiPrefs.boardScale,
+      coordinateStyle: uiPrefs.coordinateStyle,
+      showHelperBox: false,
+      underBoardStripHeight: 36,
+      isStackedLayout: !isPuzzleDesktopSplit || !lockPuzzleViewport,
+    });
+  }, [
+    isPuzzleDesktopSplit,
+    lockPuzzleViewport,
+    puzzleArenaSize.width,
+    puzzleArenaSize.height,
+    uiPrefs.boardScale,
+    uiPrefs.coordinateStyle,
+  ]);
   // Persistent Player Puzzle Stats
   const [playerStats, setPlayerStats] = useState<PlayerPuzzleStats>(() => {
     return loadPlayerPuzzleStats();
@@ -775,7 +880,11 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
   return (
     <div
       data-testid="puzzle-mode-view"
-      className="min-h-dvh lg:h-dvh w-full bg-[#111815] text-[#F4EFE6] flex flex-col relative overflow-x-hidden lg:overflow-hidden"
+      className={`w-full bg-[#111815] text-[#F4EFE6] flex flex-col relative overflow-x-hidden ${
+        lockPuzzleViewport
+          ? 'h-dvh overflow-hidden'
+          : 'min-h-dvh overflow-y-auto'
+      }`}
     >
       {/* Top Header Bar for Adaptive Puzzle Mode */}
       <header className="w-full bg-[#16201C] border-b border-[#2A3B32] px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md z-30">
@@ -860,6 +969,21 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
             <option value="2000_2400">Expert (2000-2400)</option>
             <option value="2400_plus">Master (2400+)</option>
           </select>
+
+          {/* Board & Layout Customizer */}
+          {onOpenBoardCustomizer && (
+            <button
+              type="button"
+              data-testid="puzzle-board-customizer-btn"
+              onClick={onOpenBoardCustomizer}
+              aria-label="Customize board theme and size"
+              title="Board Theme & Layout"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#212E27] hover:bg-[#2B3B32] border border-[#34463C] hover:border-[#C6923A] text-[#D6CFC2] hover:text-[#F4EFE6] text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#C6923A]" />
+              <span className="hidden md:inline">Board</span>
+            </button>
+          )}
 
           {/* Sound & Next Actions */}
           <button
@@ -954,9 +1078,12 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
       )}
 
       {/* Main Tactical Arena: 2 Columns (Board Left · Context & Feedback Right) */}
-      <main className="flex-1 min-h-0 w-full max-w-[1440px] mx-auto px-3 sm:px-6 py-3 flex flex-col lg:flex-row items-center lg:items-stretch justify-center gap-4 lg:gap-6">
+      <main
+        ref={puzzleArenaRef}
+        className="flex-1 min-h-0 w-full max-w-[1920px] mx-auto px-3 sm:px-6 py-3 flex flex-col lg:flex-row items-center lg:items-stretch justify-center gap-4 lg:gap-6"
+      >
         {/* Left Column: Chess Board Area */}
-        <div className="flex flex-col items-center justify-center gap-2 shrink-0 min-h-0">
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 min-w-0 min-h-0">
           {puzzleState && (
             <ChessBoard
               gameState={puzzleState}
@@ -988,11 +1115,30 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
               onSelectPromotion={handleSelectPromotion}
               onCancelPromotion={() => setPendingPromotion(null)}
               hideHelperBox={true}
+              boardSizePx={puzzleBoardGeometry.boardSizePx}
+              maxFitSizePx={puzzleBoardGeometry.maxFitSizePx}
+              boardTheme={uiPrefs.boardTheme}
+              coordinateStyle={uiPrefs.coordinateStyle}
+              boardScale={uiPrefs.boardScale}
+              isResizable={Boolean(onUpdateUiPrefs)}
+              onBoardScaleChange={
+                onUpdateUiPrefs
+                  ? (nextScale) => onUpdateUiPrefs({ boardScale: nextScale }, true)
+                  : undefined
+              }
+              onResetBoardScale={
+                onUpdateUiPrefs
+                  ? () => onUpdateUiPrefs({ boardScale: 1.0 }, true)
+                  : undefined
+              }
             />
           )}
 
           {/* Under-Board Action Ribbon: Quick controls & status info */}
-          <div className="w-full max-w-[420px] flex items-center justify-between text-xs font-mono text-[#A69F91] px-1 py-0.5">
+          <div
+            style={{ width: `${puzzleBoardGeometry.frameWidthPx}px` }}
+            className="max-w-full flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-[#A69F91] px-1 py-0.5 tabular-nums"
+          >
             <div className="flex items-center gap-2">
               <span className="font-semibold text-[#F4EFE6]">
                 {playerColor === 'w' ? 'White' : 'Black'} to move
@@ -1023,7 +1169,7 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
         </div>
 
         {/* Right Column: Progressive Hint System, Live Context & Post-Solve Feedback Card */}
-        <div className="flex-1 w-full max-w-[480px] lg:max-w-[420px] flex flex-col gap-3 min-h-0">
+        <div className="w-full lg:w-[420px] lg:shrink-0 flex flex-col gap-3 min-h-0 lg:overflow-y-auto">
           {/* Active Goal / Turn Card */}
           <section
             aria-label="Tactical Goal and Status"

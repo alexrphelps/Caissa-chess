@@ -71,6 +71,7 @@ import {
   Square,
   StoredGameSession,
 } from './chess/types';
+import { BoardCustomizerModal } from './components/BoardCustomizerModal';
 import { ChessBoard } from './components/ChessBoard';
 import { EngineCustomizerModal } from './components/EngineCustomizerModal';
 import { GameReviewModal } from './components/GameReviewModal';
@@ -83,6 +84,17 @@ import { PuzzleModeView } from './components/PuzzleModeView';
 import { SavedGamesModal } from './components/SavedGamesModal';
 import { StatusModal } from './components/StatusModal';
 import { TitleScreen } from './components/TitleScreen';
+import {
+  clampCoachPanelWidth,
+  computeBoardGridSize,
+  DEFAULT_UI_LAYOUT_PREFERENCES,
+  loadUILayoutPreferences,
+  MAX_COACH_WIDTH,
+  MIN_COACH_WIDTH,
+  saveUILayoutPreferences,
+  SPLITTER_WIDTH_PX,
+  UILayoutPreferences,
+} from './utils/layoutMath';
 import { soundFX } from './utils/sound';
 
 const HELPER_STORAGE_KEY = 'caissa_helper_mode';
@@ -175,6 +187,281 @@ export default function App() {
   });
 
   const [isCustomizerOpen, setIsCustomizerOpen] = useState<boolean>(false);
+  const [isBoardCustomizerOpen, setIsBoardCustomizerOpen] =
+    useState<boolean>(false);
+
+  // Persisted UI & Board Layout Preferences (theme, coordinates, scale, Tactical Coach split width)
+  const [uiPrefs, setUiPrefs] = useState<UILayoutPreferences>(() =>
+    loadUILayoutPreferences()
+  );
+  const uiPrefsRef = useRef<UILayoutPreferences>(uiPrefs);
+  useEffect(() => {
+    uiPrefsRef.current = uiPrefs;
+  }, [uiPrefs]);
+
+  const updateUiPrefs = useCallback(
+    (patch: Partial<UILayoutPreferences>, persist = true) => {
+      setUiPrefs((prev) => {
+        const next: UILayoutPreferences = { ...prev, ...patch };
+        uiPrefsRef.current = next;
+        if (persist) {
+          saveUILayoutPreferences(next);
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const resetUiPrefs = useCallback(() => {
+    const defaults = { ...DEFAULT_UI_LAYOUT_PREFERENCES };
+    uiPrefsRef.current = defaults;
+    setUiPrefs(defaults);
+    saveUILayoutPreferences(defaults);
+  }, []);
+
+  // Responsive Viewport & Arena Measurement (adapts seamlessly to window resize and browser zoom)
+  const arenaRef = useRef<HTMLElement | null>(null);
+  const [viewportSize, setViewportSize] = useState<{
+    width: number;
+    height: number;
+  }>(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1440,
+    height: typeof window !== 'undefined' ? window.innerHeight : 900,
+  }));
+  const [arenaSize, setArenaSize] = useState<{ width: number; height: number }>(
+    () => ({
+      width: typeof window !== 'undefined' ? window.innerWidth : 1440,
+      height:
+        typeof window !== 'undefined'
+          ? Math.max(420, window.innerHeight - 56)
+          : 844,
+    })
+  );
+
+  useEffect(() => {
+    const syncViewport = () => {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    window.addEventListener('resize', syncViewport);
+    return () => window.removeEventListener('resize', syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (shellState === 'title' || shellState === 'puzzles') return;
+    const node = arenaRef.current;
+    if (!node) return;
+
+    const measure = () => {
+      const rect = node.getBoundingClientRect();
+      const style = window.getComputedStyle(node);
+      const padX =
+        (parseFloat(style.paddingLeft) || 0) +
+        (parseFloat(style.paddingRight) || 0);
+      const padY =
+        (parseFloat(style.paddingTop) || 0) +
+        (parseFloat(style.paddingBottom) || 0);
+      const nextWidth = Math.max(300, Math.floor(rect.width - padX));
+      // Use the smaller of actual arena box height or remaining visible viewport height
+      // so zoomed/short screens stay cleanly bounded without clipping.
+      const remainingViewportH = Math.max(
+        340,
+        Math.floor(window.innerHeight - rect.top - padY)
+      );
+      const boxInnerH = Math.max(340, Math.floor(rect.height - padY));
+      const nextHeight =
+        window.innerWidth >= 940 && window.innerHeight >= 540
+          ? Math.min(boxInnerH, remainingViewportH)
+          : remainingViewportH;
+
+      setArenaSize((prev) =>
+        prev.width === nextWidth && prev.height === nextHeight
+          ? prev
+          : { width: nextWidth, height: nextHeight }
+      );
+    };
+
+    measure();
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(node);
+    window.addEventListener('resize', measure);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [shellState]);
+
+  // Split-pane geometry: side-by-side on desktop & zoomed desktop (>= 940px), stacked on narrow/mobile
+  const canUseDesktopSplit = viewportSize.width >= 940;
+  const isDesktopSplit = canUseDesktopSplit && uiPrefs.isCoachPanelOpen;
+  const lockViewportHeight = canUseDesktopSplit && viewportSize.height >= 540;
+
+  const effectiveCoachWidth = useMemo(() => {
+    if (!isDesktopSplit) return uiPrefs.coachPanelWidth;
+    return clampCoachPanelWidth(uiPrefs.coachPanelWidth, arenaSize.width);
+  }, [isDesktopSplit, uiPrefs.coachPanelWidth, arenaSize.width]);
+
+  const boardGeometry = useMemo(() => {
+    const boardColWidth = isDesktopSplit
+      ? Math.max(320, arenaSize.width - effectiveCoachWidth - SPLITTER_WIDTH_PX)
+      : arenaSize.width;
+    const underBoardStripHeight = boardColWidth < 360 ? 128 : 108;
+    return computeBoardGridSize({
+      availableWidth: boardColWidth,
+      availableHeight: arenaSize.height,
+      boardScale: uiPrefs.boardScale,
+      coordinateStyle: uiPrefs.coordinateStyle,
+      showHelperBox: uiPrefs.showBoardTooltip,
+      underBoardStripHeight,
+      isStackedLayout: !canUseDesktopSplit || !lockViewportHeight,
+    });
+  }, [
+    isDesktopSplit,
+    arenaSize.width,
+    arenaSize.height,
+    effectiveCoachWidth,
+    uiPrefs.boardScale,
+    uiPrefs.coordinateStyle,
+    uiPrefs.showBoardTooltip,
+    canUseDesktopSplit,
+    lockViewportHeight,
+  ]);
+
+  // Draggable Tactical Coach vertical splitter state (high-frequency drag data kept in refs)
+  const [isDraggingCoach, setIsDraggingCoach] = useState<boolean>(false);
+  const coachDragRef = useRef<{
+    startX: number;
+    startWidth: number;
+    containerWidth: number;
+    rafId: number | null;
+    latestWidth: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isDraggingCoach) return;
+
+    const prevCursor = document.body.style.cursor;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onPointerMove = (e: PointerEvent) => {
+      const drag = coachDragRef.current;
+      if (!drag) return;
+      // Coach panel is on the right: dragging left (negative dx) widens Coach, dragging right narrows it.
+      const deltaX = drag.startX - e.clientX;
+      const nextWidth = clampCoachPanelWidth(
+        drag.startWidth + deltaX,
+        drag.containerWidth
+      );
+      drag.latestWidth = nextWidth;
+
+      if (drag.rafId === null) {
+        drag.rafId = window.requestAnimationFrame(() => {
+          const current = coachDragRef.current;
+          if (!current) return;
+          current.rafId = null;
+          updateUiPrefs({ coachPanelWidth: current.latestWidth }, false);
+        });
+      }
+    };
+
+    const finishDrag = () => {
+      const drag = coachDragRef.current;
+      if (drag) {
+        if (drag.rafId !== null) {
+          window.cancelAnimationFrame(drag.rafId);
+        }
+        updateUiPrefs({ coachPanelWidth: drag.latestWidth }, true);
+        coachDragRef.current = null;
+      }
+      setIsDraggingCoach(false);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', finishDrag);
+    window.addEventListener('pointercancel', finishDrag);
+
+    return () => {
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevUserSelect;
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', finishDrag);
+      window.removeEventListener('pointercancel', finishDrag);
+      const drag = coachDragRef.current;
+      if (drag && drag.rafId !== null) {
+        window.cancelAnimationFrame(drag.rafId);
+      }
+    };
+  }, [isDraggingCoach, updateUiPrefs]);
+
+  const handleStartCoachResize = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0 || !isDesktopSplit) return;
+      e.preventDefault();
+      coachDragRef.current = {
+        startX: e.clientX,
+        startWidth: effectiveCoachWidth,
+        containerWidth: arenaSize.width,
+        rafId: null,
+        latestWidth: effectiveCoachWidth,
+      };
+      setIsDraggingCoach(true);
+    },
+    [isDesktopSplit, effectiveCoachWidth, arenaSize.width]
+  );
+
+  const handleCoachDividerKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!isDesktopSplit) return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        updateUiPrefs({
+          coachPanelWidth: clampCoachPanelWidth(
+            effectiveCoachWidth + 24,
+            arenaSize.width
+          ),
+        });
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        updateUiPrefs({
+          coachPanelWidth: clampCoachPanelWidth(
+            effectiveCoachWidth - 24,
+            arenaSize.width
+          ),
+        });
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        updateUiPrefs({
+          coachPanelWidth: clampCoachPanelWidth(
+            MIN_COACH_WIDTH,
+            arenaSize.width
+          ),
+        });
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        updateUiPrefs({
+          coachPanelWidth: clampCoachPanelWidth(
+            MAX_COACH_WIDTH,
+            arenaSize.width
+          ),
+        });
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        updateUiPrefs({
+          coachPanelWidth: clampCoachPanelWidth(
+            DEFAULT_UI_LAYOUT_PREFERENCES.coachPanelWidth,
+            arenaSize.width
+          ),
+        });
+      }
+    },
+    [isDesktopSplit, effectiveCoachWidth, arenaSize.width, updateUiPrefs]
+  );
 
   // Derived legacy AIDifficulty for backward-compatible badges/components
   const aiDifficulty: AIDifficulty = useMemo(() => {
@@ -1008,6 +1295,13 @@ export default function App() {
         return;
       }
 
+      if (isBoardCustomizerOpen) {
+        if (e.key === 'Escape') {
+          setIsBoardCustomizerOpen(false);
+        }
+        return;
+      }
+
       if (shellState === 'title') {
         if (e.key === 's' || e.key === 'S') {
           setIsSavedGamesOpen((prev) => !prev);
@@ -1087,6 +1381,7 @@ export default function App() {
     shellState,
     isSavedGamesOpen,
     isCustomizerOpen,
+    isBoardCustomizerOpen,
     previewPly,
     pendingPromotion,
     canUndo,
@@ -1100,15 +1395,29 @@ export default function App() {
 
   if (shellState === 'puzzles') {
     return (
-      <PuzzleModeView
-        onExit={() => {
-          clearPendingTimers();
-          setIsAIThinking(false);
-          setShellState('title');
-        }}
-        isMuted={isMuted}
-        onToggleMute={handleToggleMute}
-      />
+      <>
+        <PuzzleModeView
+          onExit={() => {
+            clearPendingTimers();
+            setIsAIThinking(false);
+            setShellState('title');
+          }}
+          isMuted={isMuted}
+          onToggleMute={handleToggleMute}
+          uiPrefs={uiPrefs}
+          onUpdateUiPrefs={updateUiPrefs}
+          onOpenBoardCustomizer={() => setIsBoardCustomizerOpen(true)}
+        />
+        <BoardCustomizerModal
+          isOpen={isBoardCustomizerOpen}
+          preferences={uiPrefs}
+          currentBoardPx={boardGeometry.boardSizePx}
+          maxFitBoardPx={boardGeometry.maxFitSizePx}
+          onClose={() => setIsBoardCustomizerOpen(false)}
+          onChangePreferences={(patch) => updateUiPrefs(patch, true)}
+          onResetDefaults={resetUiPrefs}
+        />
+      </>
     );
   }
 
@@ -1177,8 +1486,14 @@ export default function App() {
     (retryBlunderSession === null && gameMode === 'ai' && gameState.turn !== playerColor);
 
   return (
-    <div className="min-h-dvh lg:h-dvh w-full bg-[#111815] text-[#F4EFE6] flex flex-col relative overflow-x-hidden lg:overflow-hidden">
-      {/* Full-Width Top Header Bar: Status, AI Difficulty/Telemetry, Move History Popover, Undo & Options */}
+    <div
+      className={`w-full bg-[#111815] text-[#F4EFE6] flex flex-col relative overflow-x-hidden ${
+        lockViewportHeight
+          ? 'h-dvh overflow-hidden'
+          : 'min-h-dvh overflow-y-auto'
+      }`}
+    >
+      {/* Full-Width Top Header Bar: Status, AI Difficulty/Telemetry, Move History Popover, Board Customizer, Undo & Options */}
       <TopHeaderBar
         gameState={gameState}
         gameMode={gameMode}
@@ -1203,6 +1518,11 @@ export default function App() {
         onSelectPreset={handleSelectPreset}
         onChangeElo={handleChangeElo}
         onOpenCustomizer={() => setIsCustomizerOpen(true)}
+        onOpenBoardCustomizer={() => setIsBoardCustomizerOpen(true)}
+        isCoachPanelOpen={uiPrefs.isCoachPanelOpen}
+        onToggleCoachPanel={() =>
+          updateUiPrefs({ isCoachPanelOpen: !uiPrefs.isCoachPanelOpen })
+        }
         onOpenSavedGames={() => setIsSavedGamesOpen(true)}
         onSaveCurrentSession={() => handleSaveCurrentSession()}
         savedSessionsCount={savedSessions.length}
@@ -1234,9 +1554,22 @@ export default function App() {
         onCopyPgn={handleCopyCurrentPgn}
       />
 
-      {/* Full-Viewport 2-Column Arena: Left (Board + Under-Board Player Strip) · Right (Spacious Tabbed Tactical Coach) */}
-      <main className="flex-1 min-h-0 w-full max-w-[1440px] mx-auto px-3 sm:px-5 py-2.5 flex flex-col lg:flex-row items-center lg:items-stretch justify-center gap-4 lg:gap-6">
-        <div className="flex flex-col items-center justify-center gap-2 shrink-0 min-h-0">
+      {/* Full-Viewport Fluid Split-Pane Arena: Left (Auto-Fit Resizable Board + Strip) · Draggable Divider · Right (Scalable Tactical Coach) */}
+      <main
+        ref={arenaRef}
+        data-testid="game-arena"
+        className={`flex-1 min-h-0 w-full max-w-[1920px] mx-auto px-2.5 sm:px-4 py-2 flex ${
+          isDesktopSplit
+            ? 'flex-row items-stretch justify-center gap-0'
+            : 'flex-col items-center justify-start gap-3 pb-6'
+        }`}
+      >
+        <div
+          data-testid="board-stage"
+          className={`flex flex-col items-center justify-center gap-2 min-w-0 min-h-0 ${
+            isDesktopSplit ? 'flex-1' : 'w-full shrink-0'
+          }`}
+        >
           <ChessBoard
             gameState={displayedGameState}
             legalMoves={isPreviewingHistory ? [] : legalMoves}
@@ -1278,6 +1611,17 @@ export default function App() {
             onClearPlannedArrows={handleClearPlannedArrows}
             onSelectPromotion={handleSelectPromotion}
             onCancelPromotion={() => setPendingPromotion(null)}
+            hideHelperBox={!uiPrefs.showBoardTooltip}
+            boardSizePx={boardGeometry.boardSizePx}
+            maxFitSizePx={boardGeometry.maxFitSizePx}
+            boardTheme={uiPrefs.boardTheme}
+            coordinateStyle={uiPrefs.coordinateStyle}
+            boardScale={uiPrefs.boardScale}
+            isResizable={true}
+            onBoardScaleChange={(nextScale) =>
+              updateUiPrefs({ boardScale: nextScale }, true)
+            }
+            onResetBoardScale={() => updateUiPrefs({ boardScale: 1.0 }, true)}
           />
 
           <UnderBoardPlayerStrip
@@ -1288,6 +1632,7 @@ export default function App() {
             engineProfile={engineProfile}
             previewPly={previewPly}
             totalPlies={stateStack.length - 1}
+            frameWidthPx={boardGeometry.frameWidthPx}
             onPreviewPly={setPreviewPly}
             onCopyFen={handleCopyCurrentFen}
             onCopyPgn={handleCopyCurrentPgn}
@@ -1295,25 +1640,88 @@ export default function App() {
           />
         </div>
 
-        <TacticalCoachPanel
-          gameState={gameState}
-          helperMode={helperMode}
-          showBoardSuggestions={showBoardSuggestions}
-          helperAnalysis={helperAnalysis}
-          openingAnalysis={openingAnalysis}
-          openingPrinciplesReport={openingPrinciplesReport}
-          highlightedHelperRank={highlightedHelperRank}
-          playerColor={playerColor}
-          onToggleHelperMode={handleToggleHelperMode}
-          onToggleBoardSuggestions={handleToggleBoardSuggestions}
-          onHoverHelperRank={setHighlightedHelperRank}
-          onPlayRecommendedMove={(rec: RecommendedMove) => {
-            if (!isBoardLocked) {
-              commitMove(rec.move);
+        {/* Draggable Split-Pane Resize Handle (Desktop Split Mode) */}
+        {isDesktopSplit && (
+          <div
+            data-testid="coach-resize-handle"
+            role="separator"
+            tabIndex={0}
+            aria-orientation="vertical"
+            aria-label="Resize Tactical Coach panel width"
+            aria-valuemin={MIN_COACH_WIDTH}
+            aria-valuemax={clampCoachPanelWidth(
+              MAX_COACH_WIDTH,
+              arenaSize.width
+            )}
+            aria-valuenow={effectiveCoachWidth}
+            title="Drag left or right to resize Tactical Coach · Double-click to reset width"
+            onPointerDown={handleStartCoachResize}
+            onDoubleClick={() =>
+              updateUiPrefs({
+                coachPanelWidth: clampCoachPanelWidth(
+                  DEFAULT_UI_LAYOUT_PREFERENCES.coachPanelWidth,
+                  arenaSize.width
+                ),
+              })
             }
-          }}
-        />
+            onKeyDown={handleCoachDividerKeyDown}
+            style={{ width: `${SPLITTER_WIDTH_PX}px` }}
+            className="shrink-0 flex items-center justify-center cursor-col-resize group relative touch-none select-none focus:outline-none"
+          >
+            <div
+              className={`w-[3px] h-16 rounded-full transition-all ${
+                isDraggingCoach
+                  ? 'h-32 bg-[#C6923A] shadow-[0_0_10px_rgba(198,146,58,0.55)]'
+                  : 'bg-[#2B3B32] group-hover:bg-[#C6923A] group-hover:h-24 group-focus-visible:bg-[#C6923A]'
+              }`}
+            />
+            {isDraggingCoach && (
+              <div
+                data-testid="coach-resize-readout"
+                className="pointer-events-none absolute top-1/2 -translate-y-1/2 right-4 z-40 px-2 py-1 rounded-md bg-[#121A16]/95 border border-[#C6923A] text-[11px] font-mono font-bold text-[#F4EFE6] shadow-lg whitespace-nowrap tabular-nums"
+              >
+                Coach {effectiveCoachWidth}px · Board {boardGeometry.boardSizePx}px
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Right Column: Scalable & Reflowable Tactical Coach Panel */}
+        {uiPrefs.isCoachPanelOpen && (
+          <TacticalCoachPanel
+            gameState={gameState}
+            helperMode={helperMode}
+            showBoardSuggestions={showBoardSuggestions}
+            helperAnalysis={helperAnalysis}
+            openingAnalysis={openingAnalysis}
+            openingPrinciplesReport={openingPrinciplesReport}
+            highlightedHelperRank={highlightedHelperRank}
+            playerColor={playerColor}
+            panelWidthPx={isDesktopSplit ? effectiveCoachWidth : undefined}
+            isDesktopSplit={isDesktopSplit}
+            onHidePanel={() => updateUiPrefs({ isCoachPanelOpen: false })}
+            onToggleHelperMode={handleToggleHelperMode}
+            onToggleBoardSuggestions={handleToggleBoardSuggestions}
+            onHoverHelperRank={setHighlightedHelperRank}
+            onPlayRecommendedMove={(rec: RecommendedMove) => {
+              if (!isBoardLocked) {
+                commitMove(rec.move);
+              }
+            }}
+          />
+        )}
       </main>
+
+      {/* Board & Workspace Layout Customizer Modal */}
+      <BoardCustomizerModal
+        isOpen={isBoardCustomizerOpen}
+        preferences={uiPrefs}
+        currentBoardPx={boardGeometry.boardSizePx}
+        maxFitBoardPx={boardGeometry.maxFitSizePx}
+        onClose={() => setIsBoardCustomizerOpen(false)}
+        onChangePreferences={(patch) => updateUiPrefs(patch, true)}
+        onResetDefaults={resetUiPrefs}
+      />
 
       {/* Granular AI Engine Customizer Modal */}
       <EngineCustomizerModal

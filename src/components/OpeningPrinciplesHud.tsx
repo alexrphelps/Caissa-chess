@@ -63,22 +63,22 @@ export const OpeningPrinciplesHud: React.FC<OpeningPrinciplesHudProps> = ({
       className="bg-[#17211C] border border-[#2E3F35] rounded-xl overflow-hidden shadow-lg transition-all text-[#F4EFE6]"
     >
       {/* Header Bar */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#141C18] border-b border-[#24332B]">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 bg-[#141C18] border-b border-[#24332B]">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
           <span className="text-[#C6923A] text-sm">♔</span>
           <span className="text-xs font-bold font-mono tracking-wide uppercase text-[#EADBC8]">
             Opening Principles
           </span>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1D2922] border border-[#3A4E42] text-[#A69F91]">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1D2922] border border-[#3A4E42] text-[#A69F91] tabular-nums">
             Move {report.moveNumber}/12
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Grade Badge */}
           <span
             data-testid="opening-grade-badge"
-            className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded-full ${gradeInfo.badge}`}
+            className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded-full tabular-nums ${gradeInfo.badge}`}
           >
             {report.grade} ({report.overallScore}%)
           </span>
@@ -99,7 +99,7 @@ export const OpeningPrinciplesHud: React.FC<OpeningPrinciplesHudProps> = ({
           {/* Headline Feedback */}
           <div className="text-xs text-[#D6CFC2] leading-relaxed bg-[#111714] p-2 rounded-lg border border-[#24332B] flex items-start gap-2">
             <span className="text-[#C6923A] shrink-0 mt-0.5">💡</span>
-            <span>{report.headlineFeedback}</span>
+            <span className="min-w-0 break-words">{report.headlineFeedback}</span>
           </div>
 
           {/* 4 Milestones List */}
@@ -118,19 +118,19 @@ export const OpeningPrinciplesHud: React.FC<OpeningPrinciplesHudProps> = ({
                       : 'bg-[#121A16] border-[#223028] hover:border-[#384E40]'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                    <div className="flex items-center gap-2 min-w-0">
                       <span
-                        className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold border ${meta.badgeBg}`}
+                        className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold border shrink-0 ${meta.badgeBg}`}
                       >
                         {meta.icon}
                       </span>
-                      <span className="text-xs font-semibold text-[#F4EFE6]">
+                      <span className="text-xs font-semibold text-[#F4EFE6] break-words">
                         {milestone.title}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0 ml-auto">
                       {/* Mini Progress Bar */}
                       <div className="w-16 h-1.5 bg-[#0D1411] rounded-full overflow-hidden border border-[#26362D]">
                         <div
@@ -144,7 +144,7 @@ export const OpeningPrinciplesHud: React.FC<OpeningPrinciplesHudProps> = ({
                           style={{ width: `${milestone.progressPercent}%` }}
                         />
                       </div>
-                      <span className="text-[10px] font-mono text-[#A69F91] w-7 text-right">
+                      <span className="text-[10px] font-mono text-[#A69F91] w-7 text-right tabular-nums">
                         {milestone.progressPercent}%
                       </span>
                     </div>

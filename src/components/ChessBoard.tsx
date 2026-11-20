@@ -23,6 +23,15 @@ import {
   Square,
 } from '../chess/types';
 import { ChessPieceSvg, PIECE_NAMES } from './ChessPieceSvg';
+import {
+  BOARD_THEMES,
+  BoardThemeId,
+  clampNumber,
+  computeScaleFromCornerDrag,
+  CoordinateStyle,
+  MAX_BOARD_SCALE,
+  MIN_BOARD_SCALE,
+} from '../utils/layoutMath';
 
 interface ChessBoardProps {
   gameState: GameState;
@@ -49,6 +58,14 @@ interface ChessBoardProps {
   hintDestSquare?: Square | null;
   hintArrow?: { from: Square; to: Square } | null;
   hideHelperBox?: boolean;
+  boardSizePx?: number;
+  maxFitSizePx?: number;
+  boardTheme?: BoardThemeId;
+  coordinateStyle?: CoordinateStyle;
+  boardScale?: number;
+  isResizable?: boolean;
+  onBoardScaleChange?: (nextScale: number) => void;
+  onResetBoardScale?: () => void;
 }
 
 const RANK_ARROW_STYLES: Record<
@@ -125,14 +142,68 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   hintDestSquare = null,
   hintArrow = null,
   hideHelperBox = false,
+  boardSizePx,
+  maxFitSizePx,
+  boardTheme = 'mahogany',
+  coordinateStyle = 'both',
+  boardScale = 1.0,
+  isResizable = false,
+  onBoardScaleChange,
+  onResetBoardScale,
 }) => {
   const boardGridRef = useRef<HTMLDivElement | null>(null);
   const ghostPieceRef = useRef<HTMLDivElement | null>(null);
   const suppressNextClickRef = useRef<boolean>(false);
+  const resizeDragRef = useRef<{
+    startX: number;
+    startY: number;
+    startBoardPx: number;
+    maxFitPx: number;
+  } | null>(null);
 
+  const [isDraggingBoardSize, setIsDraggingBoardSize] = useState<boolean>(false);
   const [heldPiece, setHeldPiece] = useState<HeldPieceState | null>(null);
   const [dragOverSquare, setDragOverSquare] = useState<Square | null>(null);
   const [hoveredSquare, setHoveredSquare] = useState<Square | null>(null);
+
+  const activeTheme = BOARD_THEMES[boardTheme] ?? BOARD_THEMES.mahogany;
+  const showOutsideCoords =
+    coordinateStyle === 'both' || coordinateStyle === 'outside';
+  const showInsideCoords =
+    coordinateStyle === 'both' || coordinateStyle === 'inside';
+
+  // Global pointer listeners while dragging the board corner resize grip
+  useEffect(() => {
+    if (!isDraggingBoardSize) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const drag = resizeDragRef.current;
+      if (!drag || !onBoardScaleChange) return;
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      const nextScale = computeScaleFromCornerDrag(
+        drag.startBoardPx,
+        drag.maxFitPx,
+        dx,
+        dy
+      );
+      onBoardScaleChange(nextScale);
+    };
+
+    const handlePointerUp = () => {
+      resizeDragRef.current = null;
+      setIsDraggingBoardSize(false);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [isDraggingBoardSize, onBoardScaleChange]);
 
   // Right-click planning state (supports both right-click drag and two-step right-click)
   const [rightDrag, setRightDrag] = useState<{
@@ -504,45 +575,79 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
       ? { from: rightDrag.from, to: rightDrag.current }
       : null;
 
+  const explicitGridStyle: React.CSSProperties | undefined = boardSizePx
+    ? { width: `${boardSizePx}px`, height: `${boardSizePx}px` }
+    : undefined;
+  const fallbackGridSizeClass = boardSizePx
+    ? ''
+    : 'w-[min(86vw,calc(100dvh-230px),680px)] h-[min(86vw,calc(100dvh-230px),680px)]';
+  const rankColumnStyle: React.CSSProperties | undefined = boardSizePx
+    ? { height: `${boardSizePx}px` }
+    : undefined;
+  const fallbackRankHeightClass = boardSizePx
+    ? ''
+    : 'h-[min(86vw,calc(100dvh-230px),680px)]';
+  const isCompactBoard = (boardSizePx ?? 520) < 380;
+
   return (
-    <div className="relative flex flex-col items-center justify-center select-none shrink-0">
-      {/* Outer Mahogany Tournament Frame with Viewport-Fitted Geometry */}
+    <div className="relative flex flex-col items-center justify-center select-none shrink-0 max-w-full">
+      {/* Outer Tournament Board Frame with Dynamic Viewport-Fitted Geometry */}
       <div
         data-testid="chess-board-frame"
-        className="relative p-3 sm:p-3.5 rounded-xl bg-[#2B1B12] border-2 border-[#4A3222] shadow-[0_16px_40px_rgba(0,0,0,0.65)] flex flex-col"
+        data-board-theme={activeTheme.id}
+        data-board-size={boardSizePx ?? undefined}
+        className="relative p-2.5 sm:p-3 rounded-xl border-2 shadow-[0_16px_40px_rgba(0,0,0,0.65)] flex flex-col transition-colors duration-150"
+        style={{
+          backgroundColor: activeTheme.frameBg,
+          borderColor: activeTheme.frameBorder,
+        }}
       >
         {/* Top File Coordinates (a-h) */}
-        <div className="grid grid-cols-8 mb-1 px-5 h-3.5 items-center">
-          {colIndices.map((c) => (
-            <div
-              key={`top-file-${FILES[c]}`}
-              className="text-center text-[11px] font-mono font-semibold uppercase tracking-wider text-[#C6B39E] leading-none"
-              aria-hidden="true"
-            >
-              {FILES[c]}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center">
-          {/* Left Rank Coordinates (1-8) */}
-          <div className="flex flex-col justify-around mr-1.5 w-3 h-[min(78vw,calc(100dvh-440px),420px)] shrink-0">
-            {rowIndices.map((r) => (
+        {showOutsideCoords && (
+          <div className="grid grid-cols-8 mb-1 px-5 h-4 items-center shrink-0">
+            {colIndices.map((c) => (
               <div
-                key={`left-rank-${RANKS[r]}`}
-                className="text-center text-[11px] font-mono font-semibold text-[#C6B39E] leading-none"
+                key={`top-file-${FILES[c]}`}
+                className="text-center text-[11px] font-mono font-semibold uppercase tracking-wider leading-none"
+                style={{ color: activeTheme.coordOuterText }}
                 aria-hidden="true"
               >
-                {RANKS[r]}
+                {FILES[c]}
               </div>
             ))}
           </div>
+        )}
+
+        <div className="flex items-stretch">
+          {/* Left Rank Coordinates (1-8) — Always height-synced with 8x8 grid */}
+          {showOutsideCoords && (
+            <div
+              className={`flex flex-col justify-around mr-1.5 w-3.5 shrink-0 ${fallbackRankHeightClass}`}
+              style={rankColumnStyle}
+            >
+              {rowIndices.map((r) => (
+                <div
+                  key={`left-rank-${RANKS[r]}`}
+                  className="text-center text-[11px] font-mono font-semibold leading-none"
+                  style={{ color: activeTheme.coordOuterText }}
+                  aria-hidden="true"
+                >
+                  {RANKS[r]}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* 8x8 Chessboard Grid Container with Isolated SVG Overlays & Ghost Piece */}
           <div
             ref={boardGridRef}
+            data-testid="chess-board-grid"
             onContextMenu={(e) => e.preventDefault()}
-            className={`relative w-[min(78vw,calc(100dvh-440px),420px)] h-[min(78vw,calc(100dvh-440px),420px)] border-2 border-[#160D08] rounded-sm overflow-hidden shrink-0 touch-none transition-shadow ${
+            style={{
+              ...explicitGridStyle,
+              borderColor: activeTheme.gridBorder,
+            }}
+            className={`relative ${fallbackGridSizeClass} border-2 rounded-sm overflow-hidden shrink-0 touch-none transition-shadow ${
               shakeBoard ? 'board-shake-anim ring-4 ring-[#EF4444]' : ''
             }`}
           >
@@ -585,12 +690,16 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                     visibleBoardAnalysis?.threatenedPieces.get(square);
                   const recMoveOnTarget = recommendedByTo.get(square);
 
-                  // Determine square background color
-                  let bgColor = isLight ? '#EADBC8' : '#8B5A3C';
+                  // Determine square background color from active theme
+                  let bgColor = isLight
+                    ? activeTheme.lightSquare
+                    : activeTheme.darkSquare;
                   if (isSelected) {
-                    bgColor = '#E2B94B';
+                    bgColor = activeTheme.selectedSquare;
                   } else if (isLastMove) {
-                    bgColor = isLight ? '#E5C878' : '#AA8239';
+                    bgColor = isLight
+                      ? activeTheme.lastMoveLight
+                      : activeTheme.lastMoveDark;
                   }
 
                   // Build accessible label for screen readers & snapshots
@@ -817,22 +926,32 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                       )}
 
                       {/* Corner Rank/File Micro-notations on edge squares */}
-                      {c === colIndices[0] && (
+                      {showInsideCoords && c === colIndices[0] && (
                         <span
                           aria-hidden="true"
-                          className={`absolute top-0.5 left-1 text-[10px] font-mono font-bold leading-none pointer-events-none ${
-                            isLight ? 'text-[#73482D]' : 'text-[#EADBC8]'
+                          className={`absolute top-0.5 left-1 font-mono font-bold leading-none pointer-events-none ${
+                            isCompactBoard ? 'text-[9px]' : 'text-[10px]'
                           }`}
+                          style={{
+                            color: isLight
+                              ? activeTheme.coordOnLight
+                              : activeTheme.coordOnDark,
+                          }}
                         >
                           {RANKS[r]}
                         </span>
                       )}
-                      {r === rowIndices[7] && (
+                      {showInsideCoords && r === rowIndices[7] && (
                         <span
                           aria-hidden="true"
-                          className={`absolute bottom-0.5 right-1 text-[10px] font-mono font-bold leading-none pointer-events-none ${
-                            isLight ? 'text-[#73482D]' : 'text-[#EADBC8]'
+                          className={`absolute bottom-0.5 right-1 font-mono font-bold leading-none pointer-events-none ${
+                            isCompactBoard ? 'text-[9px]' : 'text-[10px]'
                           }`}
+                          style={{
+                            color: isLight
+                              ? activeTheme.coordOnLight
+                              : activeTheme.coordOnDark,
+                          }}
                         >
                           {FILES[c]}
                         </span>
@@ -1289,32 +1408,41 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
             )}
           </div>
 
-          {/* Right Rank Coordinates (1-8) */}
-          <div className="flex flex-col justify-around ml-1.5 w-3 h-[min(78vw,calc(100dvh-268px),576px)] shrink-0">
-            {rowIndices.map((r) => (
-              <div
-                key={`right-rank-${RANKS[r]}`}
-                className="text-center text-[11px] font-mono font-semibold text-[#C6B39E] leading-none"
-                aria-hidden="true"
-              >
-                {RANKS[r]}
-              </div>
-            ))}
-          </div>
+          {/* Right Rank Coordinates (1-8) — Always height-synced with 8x8 grid */}
+          {showOutsideCoords && (
+            <div
+              className={`flex flex-col justify-around ml-1.5 w-3.5 shrink-0 ${fallbackRankHeightClass}`}
+              style={rankColumnStyle}
+            >
+              {rowIndices.map((r) => (
+                <div
+                  key={`right-rank-${RANKS[r]}`}
+                  className="text-center text-[11px] font-mono font-semibold leading-none"
+                  style={{ color: activeTheme.coordOuterText }}
+                  aria-hidden="true"
+                >
+                  {RANKS[r]}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Bottom File Coordinates (a-h) */}
-        <div className="grid grid-cols-8 mt-1 px-5 h-3.5 items-center shrink-0">
-          {colIndices.map((c) => (
-            <div
-              key={`bottom-file-${FILES[c]}`}
-              className="text-center text-[11px] font-mono font-semibold uppercase tracking-wider text-[#C6B39E] leading-none"
-              aria-hidden="true"
-            >
-              {FILES[c]}
-            </div>
-          ))}
-        </div>
+        {showOutsideCoords && (
+          <div className="grid grid-cols-8 mt-1 px-5 h-4 items-center shrink-0">
+            {colIndices.map((c) => (
+              <div
+                key={`bottom-file-${FILES[c]}`}
+                className="text-center text-[11px] font-mono font-semibold uppercase tracking-wider leading-none"
+                style={{ color: activeTheme.coordOuterText }}
+                aria-hidden="true"
+              >
+                {FILES[c]}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Width- & Height-Locked Explanatory Helper Box (Strictly 58px tall so the board NEVER jumps or jitters) */}
         {!hideHelperBox && (
@@ -1383,7 +1511,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                   <span aria-hidden="true" className="text-[#56635B] shrink-0">
                     ·
                   </span>
-                  <span className="text-[#F4EFE6] text-[11px] line-clamp-2 min-w-0 flex-1">
+                  <span className="text-[#F4EFE6] text-[11px] truncate min-w-0 flex-1">
                     {activeTooltip.text}
                   </span>
                 </div>
@@ -1471,6 +1599,99 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                 Cancel Move
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Interactive Bottom-Right Corner Resize Handle */}
+        {isResizable && onBoardScaleChange && (
+          <button
+            type="button"
+            role="slider"
+            data-testid="board-resize-handle"
+            aria-label="Drag to resize chessboard (double-click to reset to auto-fit)"
+            aria-valuemin={Math.round(MIN_BOARD_SCALE * 100)}
+            aria-valuemax={Math.round(MAX_BOARD_SCALE * 100)}
+            aria-valuenow={Math.round(boardScale * 100)}
+            title="Drag to resize board · Double-click to Auto-Fit 100%"
+            onPointerDown={(e) => {
+              if (e.button !== 0 && e.pointerType === 'mouse') return;
+              e.preventDefault();
+              e.stopPropagation();
+              const measuredPx =
+                boardSizePx ??
+                boardGridRef.current?.getBoundingClientRect().width ??
+                480;
+              resizeDragRef.current = {
+                startX: e.clientX,
+                startY: e.clientY,
+                startBoardPx: measuredPx,
+                maxFitPx: maxFitSizePx ?? measuredPx,
+              };
+              setIsDraggingBoardSize(true);
+            }}
+            onDoubleClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onResetBoardScale) {
+                onResetBoardScale();
+              } else {
+                onBoardScaleChange(1.0);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                onBoardScaleChange(
+                  clampNumber(
+                    Number((boardScale + 0.05).toFixed(2)),
+                    MIN_BOARD_SCALE,
+                    MAX_BOARD_SCALE
+                  )
+                );
+              } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                onBoardScaleChange(
+                  clampNumber(
+                    Number((boardScale - 0.05).toFixed(2)),
+                    MIN_BOARD_SCALE,
+                    MAX_BOARD_SCALE
+                  )
+                );
+              } else if (e.key === 'Home') {
+                e.preventDefault();
+                onBoardScaleChange(MIN_BOARD_SCALE);
+              } else if (e.key === 'End' || e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onBoardScaleChange(MAX_BOARD_SCALE);
+              }
+            }}
+            className={`absolute bottom-1 right-1 z-25 w-6 h-6 rounded-br-lg rounded-tl-md flex items-end justify-end p-1 transition-colors cursor-nwse-resize focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C6923A] ${
+              isDraggingBoardSize
+                ? 'bg-[#C6923A]/30 text-[#C6923A]'
+                : 'text-[#C6B39E]/55 hover:text-[#C6923A] hover:bg-[#111815]/40'
+            }`}
+          >
+            <svg
+              viewBox="0 0 12 12"
+              className="w-3 h-3 pointer-events-none"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            >
+              <line x1="11" y1="3" x2="3" y2="11" />
+              <line x1="11" y1="7" x2="7" y2="11" />
+            </svg>
+          </button>
+        )}
+
+        {/* Live Size Readout Pill Shown Only While Actively Drag-Resizing Board */}
+        {isDraggingBoardSize && boardSizePx && (
+          <div
+            data-testid="board-resize-readout"
+            className="absolute bottom-8 right-2 z-40 px-2.5 py-1 rounded-md bg-[#111815]/95 border border-[#C6923A] text-[11px] font-mono font-bold text-[#F4EFE6] shadow-lg pointer-events-none tabular-nums"
+          >
+            {boardSizePx}×{boardSizePx}px · {Math.round(boardScale * 100)}%
           </div>
         )}
       </div>
