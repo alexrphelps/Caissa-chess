@@ -1,0 +1,362 @@
+[
+  {
+    "id": "puz_1601",
+    "fen": "6k1/5ppp/8/8/8/8/5rPP/2R3K1 b - - 0 1",
+    "moves": [
+      "f2g2",
+      "g1h1",
+      "g2c2",
+      "c1c2"
+    ],
+    "rating": 1640,
+    "ratingDeviation": 45,
+    "themes": [
+      "Defensive Resource",
+      "Swindle",
+      "Simplification"
+    ],
+    "description": "Sidestep the back-rank trap by sacrificing the h-file tempo and liquidating into a drawn rook ending."
+  },
+  {
+    "id": "puz_1602",
+    "fen": "r1b2rk1/pp1n1ppp/2p1pn2/q5B1/1bPP4/2NB1N2/PP1Q1PPP/R3K2R w KQ - 6 10",
+    "moves": [
+      "e1g1",
+      "b7b6",
+      "a2a3",
+      "b4c3",
+      "b2c3"
+    ],
+    "rating": 1720,
+    "ratingDeviation": 44,
+    "themes": [
+      "Quiet Positional Move",
+      "Prophylaxis",
+      "Pawn Structure"
+    ],
+    "description": "Castle into safety then challenge Black's pinning bishop to cement central dominance."
+  },
+  {
+    "id": "puz_1603",
+    "fen": "r1bqr1k1/pp3ppp/2n1pn2/3p4/3P4/B1PB1N2/P1P2PPP/R2QR1K1 w - - 4 11",
+    "moves": [
+      "f3e5",
+      "c6e5",
+      "d4e5",
+      "f6d7",
+      "d1h5"
+    ],
+    "rating": 1840,
+    "ratingDeviation": 42,
+    "themes": [
+      "Attacking King",
+      "Clearance",
+      "Bishop Pair"
+    ],
+    "description": "Establish a menacing outpost on e5 and launch the queen to h5 against Black's king."
+  },
+  {
+    "id": "puz_1604",
+    "fen": "r4rk1/1pq2ppp/p1nbpn2/3p4/3P4/1PN1PN2/PB2QPPP/2R2RK1 w - - 2 13",
+    "moves": [
+      "c1c2",
+      "a8c8",
+      "f1c1",
+      "c7b8",
+      "c3a4"
+    ],
+    "rating": 1790,
+    "ratingDeviation": 46,
+    "themes": [
+      "Rook File",
+      "Quiet Positional Move",
+      "Prophylaxis"
+    ],
+    "description": "Double rooks on the open c-file to exert overwhelming spatial pressure on Black's queenside."
+  },
+  {
+    "id": "puz_1605",
+    "fen": "5rk1/pp4pp/2p1p3/3pP3/8/2P1P3/PP4PP/5RK1 b - - 0 20",
+    "moves": [
+      "f8f1",
+      "g1f1",
+      "g8f7",
+      "f1e2",
+      "f7g6"
+    ],
+    "rating": 1690,
+    "ratingDeviation": 48,
+    "themes": [
+      "Endgame",
+      "King & Pawn Endgame",
+      "Opposition"
+    ],
+    "description": "Trade rooks to activate the king towards the center and penetrate the vulnerable f-file."
+  },
+  {
+    "id": "puz_1606",
+    "fen": "r2q1rk1/1b1nbppp/pp1ppn2/8/2PNP3/1PN1B3/P3BPPP/R2Q1RK1 w - - 3 12",
+    "moves": [
+      "f2f3",
+      "d8c7",
+      "d1d2",
+      "f8e8",
+      "a1c1"
+    ],
+    "rating": 1880,
+    "ratingDeviation": 40,
+    "themes": [
+      "Quiet Positional Move",
+      "Hedgehog Defense",
+      "Prophylaxis"
+    ],
+    "description": "Fortify the e4 pawn with f3, consolidating classical central control against the Hedgehog setup."
+  },
+  {
+    "id": "puz_1607",
+    "fen": "r4rk1/pp1b1ppp/1qn1pn2/3p4/1bPP4/1PNB1N2/P2B1PPP/R2Q1RK1 w - - 3 11",
+    "moves": [
+      "a2a3",
+      "b4e7",
+      "c4c5",
+      "b6c7",
+      "b3b4"
+    ],
+    "rating": 1750,
+    "ratingDeviation": 43,
+    "themes": [
+      "Pawn Storm",
+      "Center Control",
+      "Spatial Dominance"
+    ],
+    "description": "Repel the active bishop and expand with c5 and b4 to constrict Black's queen."
+  },
+  {
+    "id": "puz_1608",
+    "fen": "6k1/5ppp/8/8/1b1p4/8/5PPP/4R1K1 b - - 0 1",
+    "moves": [
+      "b4c3",
+      "e1e8"
+    ],
+    "rating": 1610,
+    "ratingDeviation": 49,
+    "themes": [
+      "Back-Rank Mate",
+      "Mate in 1"
+    ],
+    "description": "Punish the careless bishop capture with an instant back-rank checkmate."
+  },
+  {
+    "id": "puz_1609",
+    "fen": "r1b2rk1/pp1n1ppp/2p1pn2/q5B1/2PP4/2N2N2/PP1QBPPP/2KR3R b - - 6 11",
+    "moves": [
+      "b7b5",
+      "c4b5",
+      "c6b5",
+      "c3b5",
+      "a5a2"
+    ],
+    "rating": 1690,
+    "ratingDeviation": 52,
+    "themes": [
+      "Minority Attack",
+      "King Hunt",
+      "Queenside Sacrifice"
+    ],
+    "description": "Pawn sacrifice to blow open lines directly against the castled white king."
+  },
+  {
+    "id": "puz_1610",
+    "fen": "2r3k1/1p3ppp/4p3/p2p4/3P4/bP2P2P/P1r2PP1/1R1R2K1 b - - 0 23",
+    "moves": [
+      "c2a2",
+      "b1a1",
+      "c8c2",
+      "a1a2",
+      "c2a2"
+    ],
+    "rating": 1780,
+    "ratingDeviation": 54,
+    "themes": [
+      "Rook Battery",
+      "7th Rank Squeeze",
+      "Pawn Cleansing"
+    ],
+    "description": "Double on the second rank and pick off white's split queenside pawns."
+  },
+  {
+    "id": "puz_1611",
+    "fen": "r2q1rk1/1pp1bppp/p1np1n2/4p3/2B1P1b1/2NP1N2/PPP1QPPP/R1B2RK1 b - - 5 9",
+    "moves": [
+      "c6d4",
+      "e2d1",
+      "d4f3",
+      "g2f3",
+      "g4h3"
+    ],
+    "rating": 1840,
+    "ratingDeviation": 53,
+    "themes": [
+      "Kingside Ruin",
+      "Dark-Square Domination",
+      "Intermediate Move"
+    ],
+    "description": "Ruin the pawns guarding the white king and drop the bishop into the crippling h3 outpost."
+  },
+  {
+    "id": "puz_1612",
+    "fen": "8/5pk1/6p1/7p/4R2P/5KP1/r4P2/8 b - - 2 34",
+    "moves": [
+      "a2a6",
+      "e4e3",
+      "a6f6",
+      "f3e2",
+      "g7f8"
+    ],
+    "rating": 1920,
+    "ratingDeviation": 55,
+    "themes": [
+      "Triangulation",
+      "Prophylaxis",
+      "Lucena Prevention"
+    ],
+    "description": "Defend masterfully by stepping the king into position to deny white's bridge building."
+  },
+  {
+    "id": "puz_1613",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p4/2PP4/2NBPN2/PP1Q1PPP/R3K2R b KQ - 2 9",
+    "moves": [
+      "d5c4",
+      "d3c4",
+      "b7b5",
+      "c4d3",
+      "a7a6",
+      "e1g1",
+      "c6c5"
+    ],
+    "rating": 1720,
+    "ratingDeviation": 49,
+    "themes": [
+      "Meran Defense Counter",
+      "Queenside Roll",
+      "Pawn Break"
+    ],
+    "description": "Execute the thematic Meran expansion with b5, a6, and c5."
+  },
+  {
+    "id": "puz_1614",
+    "fen": "3r2k1/p4ppp/8/8/8/1P3P2/P1r3PP/R4RK1 b - - 0 25",
+    "moves": [
+      "d8d2",
+      "f1d1",
+      "d2g2",
+      "g1f1",
+      "c2f2",
+      "f1e1",
+      "g2h2"
+    ],
+    "rating": 1880,
+    "ratingDeviation": 51,
+    "themes": [
+      "Perpetual Threat",
+      "Mating Threat",
+      "Seventh Rank Exploitation"
+    ],
+    "description": "Coordinate rooks to strip white of both kingside defensive pawns."
+  },
+  {
+    "id": "puz_1615",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/1bPP4/2N1PN2/PP1BBPPP/R2QK2R b KQ - 5 7",
+    "moves": [
+      "d5c4",
+      "e2c4",
+      "b4d6",
+      "e1g1",
+      "e6e5"
+    ],
+    "rating": 1650,
+    "ratingDeviation": 48,
+    "themes": [
+      "Positional Retreat",
+      "Center Liberation",
+      "Timing"
+    ],
+    "description": "Retreat bishop to d6 to support immediate e5 central break."
+  },
+  {
+    "id": "puz_1616",
+    "fen": "8/8/4k1p1/7p/4KP1P/r5P1/8/4R3 b - - 0 45",
+    "moves": [
+      "a3g3",
+      "e4d4",
+      "e6f5",
+      "e1e5",
+      "f5f4"
+    ],
+    "rating": 1960,
+    "ratingDeviation": 56,
+    "themes": [
+      "Active King",
+      "Passed Pawn Creation",
+      "Endgame Extraction"
+    ],
+    "description": "Activate king decisively to scoop up white's remaining kingside pawns."
+  },
+  {
+    "id": "puz_1617",
+    "fen": "r1b2rk1/pp1n1ppp/2p1pn2/q5B1/2PP4/2N2N2/PP1QBPPP/2KR3R w - - 7 12",
+    "moves": [
+      "c1b1",
+      "b7b5",
+      "c4b5",
+      "c6b5",
+      "c3b5"
+    ],
+    "rating": 1670,
+    "ratingDeviation": 50,
+    "themes": [
+      "King Prophylaxis",
+      "Pawn Snatch",
+      "Opening Theory"
+    ],
+    "description": "Step king to b1 out of potential pin before grabbing flank pawn."
+  },
+  {
+    "id": "puz_1618",
+    "fen": "2r3k1/1p3ppp/4p3/p2p4/3P4/bP2P1P1/P1r2P1P/R2R2K1 b - - 0 24",
+    "moves": [
+      "c2b2",
+      "d1c1",
+      "c8c1",
+      "a1c1",
+      "g7g6"
+    ],
+    "rating": 1730,
+    "ratingDeviation": 52,
+    "themes": [
+      "7th Rank Rook",
+      "Air Pocket",
+      "Minor Piece Domination"
+    ],
+    "description": "Keep the 7th rank pressure and ensure the king has no back-rank vulnerabilities."
+  },
+  {
+    "id": "puz_1619",
+    "fen": "8/5pk1/6p1/7p/4R2P/r4KP1/5P2/8 w - - 5 37",
+    "moves": [
+      "e4e3",
+      "a3a2",
+      "e3c3",
+      "g7f6",
+      "c3c5"
+    ],
+    "rating": 1810,
+    "ratingDeviation": 54,
+    "themes": [
+      "Cut-off Defense",
+      "Endgame Technique",
+      "Prophylaxis"
+    ],
+    "description": "Cut off black's king along the 5th rank to neutralize advancing ideas."
+  }
+]

@@ -1,0 +1,448 @@
+[
+  {
+    "id": "puz_0401",
+    "fen": "3r2k1/1p3ppp/8/8/8/8/5PPP/3R2K1 b - - 0 1",
+    "moves": [
+      "d8b8",
+      "d1d8"
+    ],
+    "rating": 520,
+    "ratingDeviation": 65,
+    "themes": [
+      "Back-Rank Mate",
+      "Mate in 1"
+    ],
+    "description": "Punish the passive retreat by penetrating with a clean back-rank checkmate."
+  },
+  {
+    "id": "puz_0402",
+    "fen": "r1b1k2r/pppp1ppp/2n2q2/8/1bB1P3/2N2N2/PPP2PPP/R1BQK2R b KQkq - 0 7",
+    "moves": [
+      "b4c3",
+      "b2c3",
+      "f6c3",
+      "c1d2",
+      "c3c4"
+    ],
+    "rating": 680,
+    "ratingDeviation": 58,
+    "themes": [
+      "Fork",
+      "Crushing Advantage",
+      "Hanging Piece"
+    ],
+    "description": "Exploit the loose pieces on the c-file with a decisive double attack fork."
+  },
+  {
+    "id": "puz_0403",
+    "fen": "r1bqk2r/pppp1ppp/2n5/4p3/4n3/2PP1N2/PP2BPPP/RNBQK2R b KQkq - 0 6",
+    "moves": [
+      "e4f6",
+      "d3d4",
+      "e5d4",
+      "c3d4"
+    ],
+    "rating": 580,
+    "ratingDeviation": 70,
+    "themes": [
+      "Crushing Advantage",
+      "Center Control"
+    ],
+    "description": "Drive the displaced knight back and consolidate a commanding central pawn center."
+  },
+  {
+    "id": "puz_0404",
+    "fen": "r2qkb1r/pp2pppp/2n2n2/3p4/3P2b1/2NB1N2/PPP2PPP/R1BQK2R b KQkq - 4 7",
+    "moves": [
+      "c6d4",
+      "f3d4",
+      "g4d1",
+      "d3b5",
+      "f6d7"
+    ],
+    "rating": 760,
+    "ratingDeviation": 62,
+    "themes": [
+      "Discovered Attack",
+      "Decoy",
+      "Queen Sacrifice"
+    ],
+    "description": "Turn Black's greedy queen capture into a devastating discovered check and development advantage."
+  },
+  {
+    "id": "puz_0405",
+    "fen": "r1b1k1nr/pppp1ppp/2n5/2b1p3/2B1P2q/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 5",
+    "moves": [
+      "f3f7",
+      "e8d8",
+      "f7g7",
+      "h4f6",
+      "g7f6",
+      "g8f6"
+    ],
+    "rating": 640,
+    "ratingDeviation": 60,
+    "themes": [
+      "Attacking King",
+      "Pin",
+      "Fork"
+    ],
+    "description": "Infiltrate on the vulnerable f7 square to strip Black of castling rights and win a pawn."
+  },
+  {
+    "id": "puz_0406",
+    "fen": "6k1/5ppp/8/8/8/8/1r3PPP/2R3K1 b - - 0 1",
+    "moves": [
+      "b2b8",
+      "c1c8",
+      "b8c8"
+    ],
+    "rating": 490,
+    "ratingDeviation": 75,
+    "themes": [
+      "Back-Rank Mate",
+      "Mate in 1"
+    ],
+    "description": "Punish the passive rook retreat with an unavoidable back-rank checkmate."
+  },
+  {
+    "id": "puz_0407",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4p3/2B1n3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 5",
+    "moves": [
+      "d1e2",
+      "d7d5",
+      "c4b5",
+      "c8d7"
+    ],
+    "rating": 720,
+    "ratingDeviation": 64,
+    "themes": [
+      "Pin",
+      "Center Control",
+      "Hanging Piece"
+    ],
+    "description": "Pin the overextended knight along the open e-file to regain equality and control."
+  },
+  {
+    "id": "puz_0408",
+    "fen": "r1bqk2r/pppp1ppp/8/4n3/2B1P3/8/PPPP1PPP/RNBQK2R w KQkq - 0 6",
+    "moves": [
+      "c4b3",
+      "d7d6",
+      "d2d4",
+      "e5g6"
+    ],
+    "rating": 590,
+    "ratingDeviation": 68,
+    "themes": [
+      "Quiet Positional Move",
+      "Prophylaxis"
+    ],
+    "description": "Preserve the active Italian bishop and roll your central pawns to dominate the knight."
+  },
+  {
+    "id": "puz_0409",
+    "fen": "r1bqk2r/pppp1ppp/2n5/4p3/1b2n3/2NP1N2/PPP1BPPP/R1BQK2R w KQkq - 0 6",
+    "moves": [
+      "c1d2",
+      "e4d2",
+      "d1d2",
+      "e8g8"
+    ],
+    "rating": 520,
+    "ratingDeviation": 50,
+    "themes": [
+      "Hanging Piece",
+      "Recapture",
+      "Opening"
+    ],
+    "description": "Exchange minor pieces cleanly after black offers a bishop pin."
+  },
+  {
+    "id": "puz_0410",
+    "fen": "4r1k1/5ppp/8/8/8/8/1r3PPP/R5K1 b - - 0 1",
+    "moves": [
+      "b2e2",
+      "g1f1",
+      "e2e1",
+      "a1e1"
+    ],
+    "rating": 610,
+    "ratingDeviation": 45,
+    "themes": [
+      "Back-Rank",
+      "Simplification",
+      "Endgame"
+    ],
+    "description": "Infiltrate with the active rook to trade into a won endgame."
+  },
+  {
+    "id": "puz_0411",
+    "fen": "r1b1k2r/pppp1ppp/8/4q3/1bP5/2N1P3/PP3PPP/R2QKB1R b KQkq - 0 9",
+    "moves": [
+      "b4c3",
+      "b2c3",
+      "e5c3",
+      "e1e2"
+    ],
+    "rating": 680,
+    "ratingDeviation": 48,
+    "themes": [
+      "Double Attack",
+      "Fork",
+      "Pawn Structure"
+    ],
+    "description": "Damage white's queenside pawn structure and pick up the loose c3 pawn."
+  },
+  {
+    "id": "puz_0412",
+    "fen": "r3k2r/ppp2ppp/2n5/3qp3/1b6/3P1N2/PPP2PPP/R1BQK2R w KQkq - 0 9",
+    "moves": [
+      "c1d2",
+      "b4d2",
+      "d1d2",
+      "e8g8"
+    ],
+    "rating": 490,
+    "ratingDeviation": 52,
+    "themes": [
+      "Defense",
+      "Discovered Attack",
+      "Opening"
+    ],
+    "description": "Neutralize black's check by blocking with the bishop."
+  },
+  {
+    "id": "puz_0413",
+    "fen": "6k1/5ppp/8/8/8/8/r4PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "g2g3",
+      "g8f8",
+      "g1g2",
+      "a2b2"
+    ],
+    "rating": 580,
+    "ratingDeviation": 46,
+    "themes": [
+      "Back-Rank Mate Prevention",
+      "Luft",
+      "Endgame"
+    ],
+    "description": "Create flight squares (luft) for the king to evade back-rank mate."
+  },
+  {
+    "id": "puz_0414",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R b KQkq - 0 5",
+    "moves": [
+      "d7d6",
+      "c1g5",
+      "h7h6",
+      "g5f6",
+      "d8f6"
+    ],
+    "rating": 640,
+    "ratingDeviation": 47,
+    "themes": [
+      "Pin",
+      "Recapture",
+      "Opening"
+    ],
+    "description": "Break the pin on the knight and recapture toward the center."
+  },
+  {
+    "id": "puz_0415",
+    "fen": "r2qkb1r/pp2pppp/2n2n2/3p4/3P2b1/2NB1N2/PPP2PPP/R1BQK2R b KQkq - 4 6",
+    "moves": [
+      "c6d4",
+      "f3d4",
+      "g4d1",
+      "d3b5"
+    ],
+    "rating": 740,
+    "ratingDeviation": 53,
+    "themes": [
+      "Discovered Attack",
+      "Decoy",
+      "Queen Trap"
+    ],
+    "description": "Exploit the pinned d3 square to initiate a sharp tactical sequence."
+  },
+  {
+    "id": "puz_0416",
+    "fen": "6k1/pp3ppp/8/8/8/1P6/P1r2PPP/3R2K1 b - - 0 1",
+    "moves": [
+      "g8f8",
+      "d1d8",
+      "f8e7",
+      "d8d1",
+      "c2a2"
+    ],
+    "rating": 690,
+    "ratingDeviation": 49,
+    "themes": [
+      "King Activity",
+      "Endgame",
+      "Pawn Grab"
+    ],
+    "description": "Step the king forward to defend against back-rank check and win a pawn."
+  },
+  {
+    "id": "puz_0417",
+    "fen": "r1b1k2r/ppppqppp/2n5/4P3/1bP2Bn1/5N2/PP1NPPPP/R2QKB1R b KQkq - 6 6",
+    "moves": [
+      "g4e5",
+      "f4e5",
+      "c6e5",
+      "f3e5",
+      "e7e5"
+    ],
+    "rating": 720,
+    "ratingDeviation": 50,
+    "themes": [
+      "Tactical Exchange",
+      "Center Control",
+      "Recapture"
+    ],
+    "description": "Regain piece parity while exerting pressure on the central e5 square."
+  },
+  {
+    "id": "puz_0418",
+    "fen": "8/5pk1/6p1/7p/7P/5KP1/r4P2/4R3 b - - 0 1",
+    "moves": [
+      "a2a6",
+      "e1e3",
+      "a6f6",
+      "f3g2"
+    ],
+    "rating": 760,
+    "ratingDeviation": 48,
+    "themes": [
+      "Rook Check",
+      "Endgame",
+      "Positional"
+    ],
+    "description": "Check the opponent's king to push it back and seize open files."
+  },
+  {
+    "id": "puz_0419",
+    "fen": "r1bqk2r/pppp1ppp/2n5/2b1p3/4n3/2PP1N2/PP2BPPP/RNBQK2R b KQkq - 0 6",
+    "moves": [
+      "e4f2",
+      "d1b3",
+      "f2h1",
+      "c1g5"
+    ],
+    "rating": 780,
+    "ratingDeviation": 45,
+    "themes": [
+      "Fork",
+      "Royal Fork",
+      "Material Advantage"
+    ],
+    "description": "Fork queen and rook on f2 to win decisive exchange."
+  },
+  {
+    "id": "puz_0420",
+    "fen": "3r2k1/p4ppp/8/8/8/8/5PPP/3R2K1 b - - 0 1",
+    "moves": [
+      "a7a6",
+      "d1d8"
+    ],
+    "rating": 460,
+    "ratingDeviation": 40,
+    "themes": [
+      "Back-Rank Mate",
+      "Hanging Piece",
+      "Mate in 1"
+    ],
+    "description": "Deliver immediate back-rank checkmate against the pinned king."
+  },
+  {
+    "id": "puz_0421",
+    "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+    "moves": [
+      "b8c6",
+      "f1c4",
+      "f8c5",
+      "e1g1"
+    ],
+    "rating": 450,
+    "ratingDeviation": 40,
+    "themes": [
+      "Opening",
+      "Development",
+      "Italian Game"
+    ],
+    "description": "Develop knights and bishops toward the center in the Italian Game."
+  },
+  {
+    "id": "puz_0422",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/4p3/1bB1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 4 5",
+    "moves": [
+      "e1g1",
+      "e8g8",
+      "d2d3",
+      "d7d6"
+    ],
+    "rating": 510,
+    "ratingDeviation": 42,
+    "themes": [
+      "Castling",
+      "Four Knights",
+      "King Safety"
+    ],
+    "description": "Castle kingside quickly to safeguard the king in the Four Knights Game."
+  },
+  {
+    "id": "puz_0423",
+    "fen": "4r1k1/5ppp/8/8/8/8/4RPPP/6K1 w - - 0 1",
+    "moves": [
+      "e2e1",
+      "e8e1"
+    ],
+    "rating": 420,
+    "ratingDeviation": 35,
+    "themes": [
+      "Back-Rank Mate",
+      "Capture",
+      "Mate in 1"
+    ],
+    "description": "Capture the white rook to deliver clean back-rank mate."
+  },
+  {
+    "id": "puz_0424",
+    "fen": "6k1/5ppp/8/8/8/8/4rPPP/5RK1 b - - 0 1",
+    "moves": [
+      "e2e8",
+      "f1d1",
+      "g8f8",
+      "g1f1"
+    ],
+    "rating": 540,
+    "ratingDeviation": 40,
+    "themes": [
+      "Rook Reposition",
+      "Endgame",
+      "King Centralization"
+    ],
+    "description": "Reposition the rook back to the 8th rank to defend against invasion."
+  },
+  {
+    "id": "puz_0425",
+    "fen": "r1bqk2r/ppp2ppp/2n5/3np3/1bB5/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 7",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "b2c3",
+      "e8g8"
+    ],
+    "rating": 570,
+    "ratingDeviation": 44,
+    "themes": [
+      "Recapture",
+      "Pawn Structure",
+      "Opening"
+    ],
+    "description": "Break the pin on c3 by interposing the bishop on d2."
+  }
+]

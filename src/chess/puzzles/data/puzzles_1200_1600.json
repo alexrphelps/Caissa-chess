@@ -1,0 +1,413 @@
+[
+  {
+    "id": "puz_1201",
+    "fen": "8/1P1k4/8/8/8/8/1r6/2K1R3 w - - 0 1",
+    "moves": [
+      "e1d1",
+      "d7c7",
+      "c1b2",
+      "c7b7"
+    ],
+    "rating": 1280,
+    "ratingDeviation": 50,
+    "themes": [
+      "Skewer",
+      "Endgame",
+      "Rook Endgame"
+    ],
+    "description": "Execute a decisive vertical skewer on d1 to pick off the undefended black rook."
+  },
+  {
+    "id": "puz_1202",
+    "fen": "6k1/5ppp/8/8/4P3/8/5PPP/4R1K1 w - - 0 1",
+    "moves": [
+      "e4e5",
+      "g8f8",
+      "f2f4",
+      "f8e7",
+      "g1f2"
+    ],
+    "rating": 1320,
+    "ratingDeviation": 52,
+    "themes": [
+      "Endgame",
+      "King Activity",
+      "Pawn Structure"
+    ],
+    "description": "Advance the central majority and activate your king to secure a winning endgame conversion."
+  },
+  {
+    "id": "puz_1203",
+    "fen": "r2q1rk1/1pp2ppp/p1npbn2/2b1p3/2B1P3/2PP1N2/PP1N1PPP/R1BQ1RK1 w - - 4 9",
+    "moves": [
+      "f1e1",
+      "f6g4",
+      "e1e2",
+      "e6c4",
+      "d2c4"
+    ],
+    "rating": 1420,
+    "ratingDeviation": 48,
+    "themes": [
+      "Defensive Resource",
+      "Prophylaxis",
+      "Quiet Positional Move"
+    ],
+    "description": "Spot the threat against f2 and lift the rook to e2 to neutralize Black's kingside attack."
+  },
+  {
+    "id": "puz_1204",
+    "fen": "r1bq1rk1/pp1nbppp/2p1pn2/3p4/2PP4/2N1PN2/PPQ1BPPP/R1B1K2R w KQ - 4 8",
+    "moves": [
+      "e1g1",
+      "b7b6",
+      "e3e4",
+      "d5e4",
+      "c3e4"
+    ],
+    "rating": 1260,
+    "ratingDeviation": 54,
+    "themes": [
+      "Center Control",
+      "Pawn Break"
+    ],
+    "description": "Strike at the center with e4 to dissolve Black's pawn chain and unlock dynamic bishop lines."
+  },
+  {
+    "id": "puz_1205",
+    "fen": "3r2k1/p4ppp/1p6/8/8/3p4/PP1R1PPP/5K2 w - - 0 24",
+    "moves": [
+      "f1e1",
+      "g8f8",
+      "e1d1",
+      "f8e7",
+      "b2b3"
+    ],
+    "rating": 1380,
+    "ratingDeviation": 51,
+    "themes": [
+      "Endgame",
+      "King & Pawn Endgame",
+      "Blockade"
+    ],
+    "description": "Transfer the king to d1 to permanently blockade the passed d-pawn and prepare queenside expansion."
+  },
+  {
+    "id": "puz_1206",
+    "fen": "r4rk1/pbq2ppp/1pn1pn2/8/2PP4/2NB1N2/PP3PPP/R2QR1K1 w - - 0 13",
+    "moves": [
+      "a1c1",
+      "a8d8",
+      "d4d5",
+      "e6d5",
+      "c3d5"
+    ],
+    "rating": 1510,
+    "ratingDeviation": 46,
+    "themes": [
+      "Zwischenzug",
+      "Discovered Attack",
+      "Knight Outpost"
+    ],
+    "description": "Push the d-pawn to establish an immovable knight outpost on d5 targeting the black queen."
+  },
+  {
+    "id": "puz_1207",
+    "fen": "5k2/1R6/8/8/8/8/1p6/1K2R3 b - - 0 1",
+    "moves": [
+      "f8g8",
+      "e1e8"
+    ],
+    "rating": 1220,
+    "ratingDeviation": 60,
+    "themes": [
+      "Attacking King",
+      "Rook Endgame",
+      "Mate in 1"
+    ],
+    "description": "Punish the passive king step by invading the 8th rank with an immediate checkmate."
+  },
+  {
+    "id": "puz_1208",
+    "fen": "r1b2rk1/pp1nqppp/2p1pn2/8/2PP4/2N2NP1/PP2BP1P/R2Q1RK1 b - - 0 11",
+    "moves": [
+      "e6e5",
+      "f1e1",
+      "e5d4",
+      "f3d4",
+      "d7e5"
+    ],
+    "rating": 1470,
+    "ratingDeviation": 47,
+    "themes": [
+      "Pawn Break",
+      "Center Control",
+      "Piece Activity"
+    ],
+    "description": "Execute the freeing e5 break to equalize space and open diagonals for the light-squared bishop."
+  },
+  {
+    "id": "puz_1209",
+    "fen": "r1bq1rk1/1pp2ppp/p1np1n2/4p3/2B1P3/2NPPN2/PPP3PP/R2Q1RK1 b - - 0 9",
+    "moves": [
+      "c8e6",
+      "c4b3",
+      "d6d5",
+      "e4d5",
+      "f6d5"
+    ],
+    "rating": 1290,
+    "ratingDeviation": 49,
+    "themes": [
+      "Central Break",
+      "Bishop Trade",
+      "Middlegame"
+    ],
+    "description": "Challenging white's Spanish bishop with a well-timed d5 central break."
+  },
+  {
+    "id": "puz_1210",
+    "fen": "2r3k1/1p3ppp/4p3/p2p4/3P4/P3P2P/1Pr2PP1/1R1R2K1 b - - 0 21",
+    "moves": [
+      "g8f8",
+      "g1f1",
+      "f8e7",
+      "f1e1",
+      "e7d6"
+    ],
+    "rating": 1340,
+    "ratingDeviation": 51,
+    "themes": [
+      "King Centralization",
+      "Rook Endgame",
+      "Positional Mastery"
+    ],
+    "description": "March the king directly to d6 to support rook penetration."
+  },
+  {
+    "id": "puz_1211",
+    "fen": "r2qk2r/ppp1bppp/2np1n2/4p3/2B1P1b1/2NP1N2/PPP1QPPP/R1B1K2R b KQkq - 2 7",
+    "moves": [
+      "c6d4",
+      "e2d1",
+      "g4f3",
+      "g2f3"
+    ],
+    "rating": 1410,
+    "ratingDeviation": 48,
+    "themes": [
+      "Outpost",
+      "Shattered Kingside Pawns",
+      "Middlegame"
+    ],
+    "description": "Shatter white's kingside pawns by trading into the doubled f-pawn weakness."
+  },
+  {
+    "id": "puz_1212",
+    "fen": "2r3k1/pp3ppp/8/3p4/3P4/1P3P2/P2r2PP/R3R1K1 b - - 0 23",
+    "moves": [
+      "g8f8",
+      "a1c1",
+      "c8c1",
+      "e1c1",
+      "d2a2"
+    ],
+    "rating": 1260,
+    "ratingDeviation": 47,
+    "themes": [
+      "Pawn Grab",
+      "King Safety",
+      "Endgame Conversion"
+    ],
+    "description": "Neutralize back rank threats before picking off the isolated a2 pawn."
+  },
+  {
+    "id": "puz_1213",
+    "fen": "r1b2rk1/pp1n1ppp/2p1pn2/q5B1/1bPP4/2N2N2/PPQ2PPP/2KR1B1R b - - 4 10",
+    "moves": [
+      "b4c3",
+      "b2c3",
+      "c6c5",
+      "f1d3"
+    ],
+    "rating": 1470,
+    "ratingDeviation": 53,
+    "themes": [
+      "Pawn Lever",
+      "Exploiting Weaknesses",
+      "Flank Attack"
+    ],
+    "description": "Undermine white's fractured pawn center with the thematic c5 strike."
+  },
+  {
+    "id": "puz_1214",
+    "fen": "r2q1rk1/1pp2ppp/p1np1n2/2b1p3/2B1P1b1/2NP1N2/PPP1QPPP/R1B2RK1 b - - 3 9",
+    "moves": [
+      "c6d4",
+      "e2d1",
+      "c7c6",
+      "c1e3"
+    ],
+    "rating": 1380,
+    "ratingDeviation": 50,
+    "themes": [
+      "Knight Dominance",
+      "Prophylaxis",
+      "Center Stranglehold"
+    ],
+    "description": "Reinforce the monster knight on d4 to choke white's coordination."
+  },
+  {
+    "id": "puz_1215",
+    "fen": "8/5pk1/6p1/7p/4R2P/5KP1/r4P2/8 b - - 2 34",
+    "moves": [
+      "a2a3",
+      "e4e3",
+      "a3a2",
+      "f3g2"
+    ],
+    "rating": 1520,
+    "ratingDeviation": 52,
+    "themes": [
+      "Rook Harassment",
+      "King Cut-off",
+      "Endgame Precision"
+    ],
+    "description": "Check the white king and immediately reposition behind the advancing lines."
+  },
+  {
+    "id": "puz_1216",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p4/2PP4/2NBPN2/PP3PPP/R1BQK2R b KQ - 2 8",
+    "moves": [
+      "d5c4",
+      "d3c4",
+      "b7b5",
+      "c4d3",
+      "c8b7"
+    ],
+    "rating": 1310,
+    "ratingDeviation": 46,
+    "themes": [
+      "Queenside Expansion",
+      "Tempo Gain",
+      "Fianchetto"
+    ],
+    "description": "Expand on the queenside with tempo against the bishop and prepare Bb7."
+  },
+  {
+    "id": "puz_1217",
+    "fen": "3r2k1/p4ppp/8/8/8/1P3P2/P1q3PP/R4RK1 b - - 1 24",
+    "moves": [
+      "d8d2",
+      "f1c1",
+      "d2g2",
+      "g1h1",
+      "g2h2",
+      "h1g1",
+      "c2f2"
+    ],
+    "rating": 1580,
+    "ratingDeviation": 55,
+    "themes": [
+      "Mating Net",
+      "Heavy Piece Dominance",
+      "Blind Swine Checkmate"
+    ],
+    "description": "Infiltrate with queen and rook on the 2nd rank for an unstoppable checkmate."
+  },
+  {
+    "id": "puz_1218",
+    "fen": "r1bq1rk1/ppp2ppp/2n1pn2/3p4/1bPP4/2N1PN2/PP2BPPP/R1BQK2R b KQ - 4 7",
+    "moves": [
+      "d5c4",
+      "e2c4",
+      "e6e5",
+      "e1g1",
+      "e5d4"
+    ],
+    "rating": 1440,
+    "ratingDeviation": 48,
+    "themes": [
+      "Isolated Queen Pawn Setup",
+      "Central Liquidation",
+      "Opening"
+    ],
+    "description": "Liquidate the center to activate piece activity against the IQP."
+  },
+  {
+    "id": "puz_1219",
+    "fen": "r1b2rk1/pp3ppp/2n1pn2/q1pp4/2PP4/2N1PN2/PP1Q1PPP/R3KB1R b KQ - 2 9",
+    "moves": [
+      "c5d4",
+      "f3d4",
+      "c6d4",
+      "d2d4",
+      "c8d7"
+    ],
+    "rating": 1240,
+    "ratingDeviation": 46,
+    "themes": [
+      "Simplification",
+      "Queen Centralization",
+      "Bishop Development"
+    ],
+    "description": "Trade central knights to develop the light-squared bishop."
+  },
+  {
+    "id": "puz_1220",
+    "fen": "2r3k1/pp3ppp/8/3p4/3P4/1P3P2/P2r2PP/4RRK1 b - - 0 24",
+    "moves": [
+      "d2a2",
+      "e1c1",
+      "c8c1",
+      "f1c1",
+      "g7g6"
+    ],
+    "rating": 1310,
+    "ratingDeviation": 49,
+    "themes": [
+      "Endgame Conversion",
+      "Luft Creation",
+      "Passed Pawn"
+    ],
+    "description": "Create an escape square for the king while enjoying an extra pawn."
+  },
+  {
+    "id": "puz_1221",
+    "fen": "r1bq1rk1/pp3ppp/2n1pn2/3p4/2PP4/2NBPN2/PP3PPP/R1BQK2R w KQ - 0 8",
+    "moves": [
+      "e1g1",
+      "d5c4",
+      "d3c4",
+      "b7b6",
+      "e3e4"
+    ],
+    "rating": 1390,
+    "ratingDeviation": 51,
+    "themes": [
+      "Central Dominance",
+      "Bishop Recapture",
+      "Opening"
+    ],
+    "description": "Seize the center with e4 after black surrenders central tension."
+  },
+  {
+    "id": "puz_1222",
+    "fen": "r2qk2r/ppp1bppp/2np1n2/4p3/2B1P1b1/2NP1N2/PPP1QPPP/R1B2RK1 b kq - 4 7",
+    "moves": [
+      "c6d4",
+      "e2d1",
+      "d4f3",
+      "g2f3",
+      "g4h5"
+    ],
+    "rating": 1450,
+    "ratingDeviation": 52,
+    "themes": [
+      "Outpost Sacrifice",
+      "Ruined Pawn Cover",
+      "Pin Maintenance"
+    ],
+    "description": "Inflict doubled f-pawns and maintain the annoying pin on the f3 square."
+  }
+]

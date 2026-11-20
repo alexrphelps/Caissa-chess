@@ -1,0 +1,277 @@
+[
+  {
+    "id": "puz_2401",
+    "fen": "8/8/8/8/8/6k1/4p1P1/4K3 b - - 0 1",
+    "moves": [
+      "g3g2",
+      "e1e2",
+      "g2g3",
+      "e2e3"
+    ],
+    "rating": 2480,
+    "ratingDeviation": 30,
+    "themes": [
+      "Endgame",
+      "King & Pawn Endgame",
+      "Drawn Opposition"
+    ],
+    "description": "Demonstrate the precise drawing defense by taking distant opposition when Black's last pawn falls."
+  },
+  {
+    "id": "puz_2402",
+    "fen": "8/8/8/8/8/1k6/7p/K7 w - - 0 1",
+    "moves": [
+      "a1b1",
+      "h2h1q"
+    ],
+    "rating": 2420,
+    "ratingDeviation": 32,
+    "themes": [
+      "Mate in 1",
+      "Underpromotion",
+      "Endgame"
+    ],
+    "description": "Convert the theoretical pawn promotion into an immediate corner checkmate."
+  },
+  {
+    "id": "puz_2403",
+    "fen": "r1bq1rk1/1pp2ppp/p1np1n2/2b1p3/B3P3/2PP1N2/PP1N1PPP/R1BQ1RK1 b - - 0 8",
+    "moves": [
+      "c5a7",
+      "h2h3",
+      "c6e7",
+      "f1e1",
+      "e7g6"
+    ],
+    "rating": 2550,
+    "ratingDeviation": 28,
+    "themes": [
+      "Ruy Lopez",
+      "Quiet Positional Move",
+      "Prophylaxis",
+      "Knight Maneuver"
+    ],
+    "description": "Tuck the Spanish bishop to safety and orchestrate the classic e7-g6 knight transfer into kingside attacking outposts."
+  },
+  {
+    "id": "puz_2404",
+    "fen": "8/8/8/4k3/8/4K3/8/8 b - - 0 1",
+    "moves": [
+      "e5d5",
+      "e3d3",
+      "d5c5",
+      "d3c3"
+    ],
+    "rating": 2460,
+    "ratingDeviation": 31,
+    "themes": [
+      "King & Pawn Endgame",
+      "Direct Opposition",
+      "Theoretical Draw"
+    ],
+    "description": "Step into direct opposition to continually blockade the advancing king from outflanking your position."
+  },
+  {
+    "id": "puz_2405",
+    "fen": "r1bq1rk1/pp1n1ppp/2pbpn2/3p4/2PP4/2NBPN2/PP3PPP/R1BQR1K1 w - - 4 9",
+    "moves": [
+      "e3e4",
+      "d5e4",
+      "c3e4",
+      "f6e4",
+      "d3e4"
+    ],
+    "rating": 2510,
+    "ratingDeviation": 29,
+    "themes": [
+      "Central Breakthrough",
+      "Isolated Queen Pawn",
+      "Simplification"
+    ],
+    "description": "Timing is everything: trigger the central e4 break at the exact psychological moment before Black can blockade."
+  },
+  {
+    "id": "puz_2406",
+    "fen": "8/8/8/8/k7/1p6/1P6/1K6 w - - 0 1",
+    "moves": [
+      "b1c1",
+      "a4b4",
+      "c1d2",
+      "b4c4",
+      "d2e3"
+    ],
+    "rating": 2600,
+    "ratingDeviation": 25,
+    "themes": [
+      "Opposition",
+      "Triangulation",
+      "Zugzwang"
+    ],
+    "description": "Hold the impenetrable fortress by tracking Black's king movements with unflinching opposition geometry."
+  },
+  {
+    "id": "puz_2407",
+    "fen": "r1b1qrk1/pp1nbppp/2p1pn2/3p2B1/2PP4/2NBPN2/PP3PPP/R2Q1RK1 w - - 4 9",
+    "moves": [
+      "c4c5",
+      "b7b6",
+      "b2b4",
+      "a7a5",
+      "a2a3"
+    ],
+    "rating": 2530,
+    "ratingDeviation": 28,
+    "themes": [
+      "Spatial Dominance",
+      "Queen's Gambit",
+      "Prophylaxis"
+    ],
+    "description": "Lock the queenside with c5 and reinforce with b4 and a3 to asphyxiate Black's counterplay."
+  },
+  {
+    "id": "puz_2408",
+    "fen": "8/8/8/8/4k3/8/5K2/8 w - - 0 1",
+    "moves": [
+      "f2e2",
+      "e4d4",
+      "e2d2",
+      "d4c4",
+      "d2c2"
+    ],
+    "rating": 2440,
+    "ratingDeviation": 32,
+    "themes": [
+      "King & Pawn Endgame",
+      "Direct Opposition",
+      "Theoretical Draw"
+    ],
+    "description": "Maintain pure direct horizontal and vertical opposition to shut down any intrusion."
+  },
+  {
+    "id": "puz_2409",
+    "fen": "r2q1rk1/1pp1bppp/p1np1n2/4p3/2B1P1b1/2NPBN2/PPP1QPPP/R3R1K1 b - - 7 9",
+    "moves": [
+      "c6d4",
+      "e3d4",
+      "e5d4",
+      "c3d5",
+      "f6d5",
+      "c4d5",
+      "c7c6"
+    ],
+    "rating": 2460,
+    "ratingDeviation": 60,
+    "themes": [
+      "Grandmaster Prophylaxis",
+      "Structural Exploitation",
+      "Precision"
+    ],
+    "description": "Force bishop away before cementing absolute control of central dark squares."
+  },
+  {
+    "id": "puz_2410",
+    "fen": "8/5pk1/6p1/7p/4R2P/5KP1/r4P2/8 w - - 3 35",
+    "moves": [
+      "e4e3",
+      "g7f6",
+      "f3g2",
+      "f6f5",
+      "e3f3",
+      "f5e6"
+    ],
+    "rating": 2540,
+    "ratingDeviation": 62,
+    "themes": [
+      "Triangulation",
+      "Flank Harassment",
+      "Endgame Perfection"
+    ],
+    "description": "Harass the active king with precision checks to maintain defensive fortress."
+  },
+  {
+    "id": "puz_2411",
+    "fen": "8/8/4k1p1/7p/4KP1P/r5P1/8/3R4 b - - 2 47",
+    "moves": [
+      "a3g3",
+      "d1d8",
+      "g3g4",
+      "e4f3",
+      "g4h4"
+    ],
+    "rating": 2620,
+    "ratingDeviation": 65,
+    "themes": [
+      "Material Decimation",
+      "Rook Activity",
+      "King Cut-off"
+    ],
+    "description": "Sweep both white kingside pawns to promote black's h-pawn to victory."
+  },
+  {
+    "id": "puz_2412",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p4/2PP4/2NBPN2/PP1Q1PPP/R3K2R b KQ - 2 9",
+    "moves": [
+      "d5c4",
+      "d3c4",
+      "b7b5",
+      "c4e2",
+      "c8b7",
+      "e1g1",
+      "a7a6",
+      "f1d1",
+      "c6c5"
+    ],
+    "rating": 2510,
+    "ratingDeviation": 59,
+    "themes": [
+      "Deep Opening Theory",
+      "Delayed c5 Push",
+      "Dynamic Equality"
+    ],
+    "description": "Meticulously prepare the thematic c5 break to activate both bishops."
+  },
+  {
+    "id": "puz_2413",
+    "fen": "r2q1rk1/1pp1bppp/p1np1n2/4p3/2B1P1b1/2NPBN2/PPP1QPPP/R3R1K1 w - - 8 10",
+    "moves": [
+      "a2a3",
+      "c6d4",
+      "e3d4",
+      "e5d4",
+      "c3d5",
+      "f6d5",
+      "c4d5",
+      "c7c6",
+      "d5b3"
+    ],
+    "rating": 2490,
+    "ratingDeviation": 62,
+    "themes": [
+      "Master Prophylaxis",
+      "Structural Squeeze",
+      "Grandmaster Precision"
+    ],
+    "description": "Meticulously tuck bishop to b3 to retain long diagonal control."
+  },
+  {
+    "id": "puz_2414",
+    "fen": "8/5pk1/6p1/7p/4R2P/5KP1/r4P2/8 w - - 5 37",
+    "moves": [
+      "f3g2",
+      "g7f6",
+      "e4f4",
+      "f6e6",
+      "f4e4",
+      "e6f5",
+      "e4f4"
+    ],
+    "rating": 2580,
+    "ratingDeviation": 66,
+    "themes": [
+      "Endgame Triangulation",
+      "King Harassment",
+      "Fortress Holding"
+    ],
+    "description": "Repeat checking patterns along the e-file and f-file to deny any king progress."
+  }
+]

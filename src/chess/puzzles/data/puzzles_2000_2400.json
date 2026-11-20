@@ -1,0 +1,306 @@
+[
+  {
+    "id": "puz_2001",
+    "fen": "8/8/8/8/6p1/4K1P1/7k/8 w - - 0 1",
+    "moves": [
+      "e3f4",
+      "h2h3",
+      "f4g5",
+      "h3g3"
+    ],
+    "rating": 2150,
+    "ratingDeviation": 38,
+    "themes": [
+      "Zugzwang",
+      "King & Pawn Endgame",
+      "Opposition"
+    ],
+    "description": "Force the opponent into reciprocal zugzwang to decisively capture the g4 pawn and hold the key squares."
+  },
+  {
+    "id": "puz_2002",
+    "fen": "4k3/R7/8/4P3/8/5r2/4K3/8 b - - 0 1",
+    "moves": [
+      "f3f5",
+      "e2d3",
+      "f5e5",
+      "d3d4"
+    ],
+    "rating": 2040,
+    "ratingDeviation": 42,
+    "themes": [
+      "Rook Endgame",
+      "Endgame",
+      "King Activity"
+    ],
+    "description": "Centralize the king aggressively after the pawn sacrifice to dominate the open board."
+  },
+  {
+    "id": "puz_2003",
+    "fen": "r1bq1rk1/pp2ppbp/2np1np1/8/2PNP3/2N1B3/PP2BPPP/R2QK2R w KQ - 2 9",
+    "moves": [
+      "e1g1",
+      "c8d7",
+      "d1d2",
+      "c6d4",
+      "e3d4",
+      "d7c6"
+    ],
+    "rating": 2220,
+    "ratingDeviation": 36,
+    "themes": [
+      "Quiet Positional Move",
+      "Prophylaxis",
+      "Center Control"
+    ],
+    "description": "Navigate classical Sicilian Dragon piece placement with optimal prophylaxis against kingside counterplay."
+  },
+  {
+    "id": "puz_2004",
+    "fen": "8/8/4k3/8/4K3/8/8/8 w - - 0 1",
+    "moves": [
+      "e4d4",
+      "e6d6",
+      "d4c4",
+      "d6c6"
+    ],
+    "rating": 2080,
+    "ratingDeviation": 40,
+    "themes": [
+      "Opposition",
+      "King & Pawn Endgame",
+      "Triangulation"
+    ],
+    "description": "Maintain direct and diagonal opposition to prevent king penetration."
+  },
+  {
+    "id": "puz_2005",
+    "fen": "r1bq1rk1/pp3ppp/2n1pn2/2pp4/2PP4/2NBPN2/PP3PPP/R1BQK2R w KQ - 0 8",
+    "moves": [
+      "e1g1",
+      "b7b6",
+      "b2b3",
+      "c8b7",
+      "c1b2"
+    ],
+    "rating": 2180,
+    "ratingDeviation": 38,
+    "themes": [
+      "Hanging Pawns",
+      "Quiet Positional Move",
+      "Prophylaxis"
+    ],
+    "description": "Fianchetto the queen's bishop to contest the central dark squares against Black's impending hanging pawn structure."
+  },
+  {
+    "id": "puz_2006",
+    "fen": "8/p7/1p6/8/8/1P6/P7/k1K5 w - - 0 1",
+    "moves": [
+      "a2a3",
+      "a7a6",
+      "b3b4",
+      "b6b5",
+      "c1c2",
+      "a1a2"
+    ],
+    "rating": 2340,
+    "ratingDeviation": 34,
+    "themes": [
+      "Zugzwang",
+      "Pawn Endgame",
+      "Triangulation"
+    ],
+    "description": "Meticulously count reserve pawn tempos to force Black into self-suffocating zugzwang."
+  },
+  {
+    "id": "puz_2007",
+    "fen": "r4rk1/pp1b1ppp/2n1pn2/q1bp4/2PP4/1PN1PN2/PB2BPPP/R2QK2R w KQ - 3 10",
+    "moves": [
+      "e1g1",
+      "c5e7",
+      "a2a3",
+      "f8d8",
+      "b3b4"
+    ],
+    "rating": 2260,
+    "ratingDeviation": 37,
+    "themes": [
+      "Spatial Dominance",
+      "Quiet Positional Move",
+      "Prophylaxis"
+    ],
+    "description": "Safely castle and initiate systematic pawn expansion to trap Black's misplaced queen."
+  },
+  {
+    "id": "puz_2008",
+    "fen": "8/8/8/8/8/5K2/6p1/7k b - - 0 1",
+    "moves": [
+      "g2g1q",
+      "f3e2",
+      "g1g3",
+      "e2f1",
+      "g3f2"
+    ],
+    "rating": 2110,
+    "ratingDeviation": 39,
+    "themes": [
+      "Queen Endgame",
+      "Stalemate Avoidance",
+      "Endgame"
+    ],
+    "description": "Coordinate the queen and king to deliver checkmate while dodging the corner stalemate trap."
+  },
+  {
+    "id": "puz_2009",
+    "fen": "r2q1rk1/1pp1bppp/p1np1n2/4p3/2B1P1b1/2NPBN2/PPP1QPPP/R4RK1 b - - 6 9",
+    "moves": [
+      "c6d4",
+      "e3d4",
+      "e5d4",
+      "c3d5",
+      "f6d7"
+    ],
+    "rating": 2120,
+    "ratingDeviation": 54,
+    "themes": [
+      "Positional Exchange",
+      "Maneuver",
+      "Square Vacancy"
+    ],
+    "description": "Reroute knight to e5 via d7 to permanently seize the light squares."
+  },
+  {
+    "id": "puz_2010",
+    "fen": "2r3k1/1p3ppp/4p3/p2p4/3P4/bP2P1P1/P1r2P1P/1R1R2K1 b - - 0 24",
+    "moves": [
+      "c2a2",
+      "b1a1",
+      "c8c2",
+      "a1a2",
+      "c2a2",
+      "d1b1",
+      "a3b4"
+    ],
+    "rating": 2240,
+    "ratingDeviation": 58,
+    "themes": [
+      "Positional Paralysis",
+      "Prophylaxis",
+      "Domination"
+    ],
+    "description": "Lock white's rook into complete passivity with the subtle Bb4 bishop clamp."
+  },
+  {
+    "id": "puz_2011",
+    "fen": "8/5pk1/6p1/7p/4R2P/r4KP1/5P2/8 w - - 4 36",
+    "moves": [
+      "e4e3",
+      "a3a2",
+      "e3c3",
+      "g7f6",
+      "c3c6"
+    ],
+    "rating": 2080,
+    "ratingDeviation": 52,
+    "themes": [
+      "Rook Opposition",
+      "Endgame Check",
+      "Tempo Preservation"
+    ],
+    "description": "Keep checking distance while maintaining pressure on black's king."
+  },
+  {
+    "id": "puz_2012",
+    "fen": "r1bq1rk1/pp1n1ppp/2p1pn2/3p4/2PP4/2NBPN2/PP1Q1PPP/2KR3R b - - 3 9",
+    "moves": [
+      "d5c4",
+      "d3c4",
+      "b7b5",
+      "c4d3",
+      "c8b7",
+      "c1b1",
+      "a7a6"
+    ],
+    "rating": 2310,
+    "ratingDeviation": 57,
+    "themes": [
+      "Opposite Castling",
+      "Grandmaster Queenside Storm",
+      "Pawn Lever"
+    ],
+    "description": "Launch the queenside pawn storm while white's king is committed on the c-file."
+  },
+  {
+    "id": "puz_2013",
+    "fen": "8/8/4k1p1/7p/4KP1P/r5P1/8/4R3 w - - 1 46",
+    "moves": [
+      "e1e3",
+      "a3a4",
+      "e4f3",
+      "e6f6",
+      "e3b3"
+    ],
+    "rating": 2190,
+    "ratingDeviation": 55,
+    "themes": [
+      "Rook Cutoff",
+      "Sheltered King",
+      "Draw Holding"
+    ],
+    "description": "Shelter king behind g3 and reposition rook along the third rank."
+  },
+  {
+    "id": "puz_2014",
+    "fen": "3r2k1/p4ppp/8/8/8/1P3P2/P1r1q1PP/R5K1 w - - 1 26",
+    "moves": [
+      "g1h1",
+      "e2g2"
+    ],
+    "rating": 2050,
+    "ratingDeviation": 45,
+    "themes": [
+      "Checkmate",
+      "Queen & Rook Battery",
+      "Crushing Blow"
+    ],
+    "description": "Deliver immediate mate on g2 utilizing coordinated heavy pieces."
+  },
+  {
+    "id": "puz_2015",
+    "fen": "r2q1rk1/1pp1bppp/p1np1n2/4p3/2B1P1b1/2NPBN2/PPP1QPPP/R4RK1 w - - 7 10",
+    "moves": [
+      "a2a3",
+      "c6d4",
+      "e3d4",
+      "e5d4",
+      "c3d5"
+    ],
+    "rating": 2060,
+    "ratingDeviation": 55,
+    "themes": [
+      "Prophylactic a3",
+      "Central Blockade",
+      "Light-Square Control"
+    ],
+    "description": "Anticipate queenside expansion while anchoring knight on d5."
+  },
+  {
+    "id": "puz_2016",
+    "fen": "8/8/4k1p1/7p/4KP1P/r5P1/8/5R2 b - - 3 48",
+    "moves": [
+      "a3g3",
+      "f1f3",
+      "g3g4",
+      "f3a3",
+      "g4h4"
+    ],
+    "rating": 2180,
+    "ratingDeviation": 57,
+    "themes": [
+      "Pawn Decimation",
+      "Rook Endgame",
+      "Precision Conversion"
+    ],
+    "description": "Liquidate white's kingside pawns to promote the outside h-pawn."
+  }
+]

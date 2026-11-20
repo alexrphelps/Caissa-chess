@@ -1,0 +1,6 @@
+{
+  "name": "Caïssa — FIDE Standard Chess",
+  "description": "A tournament-grade FIDE chess application featuring complete rules enforcement, algebraic notation, and a tactically aware AI opponent.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

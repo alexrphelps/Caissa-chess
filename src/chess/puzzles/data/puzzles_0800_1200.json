@@ -1,0 +1,485 @@
+[
+  {
+    "id": "puz_0801",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4p3/2B1n3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 0 5",
+    "moves": [
+      "c4f7",
+      "e8f7",
+      "c3e4",
+      "d7d5",
+      "e4g3"
+    ],
+    "rating": 890,
+    "ratingDeviation": 55,
+    "themes": [
+      "Decoy",
+      "Deflection",
+      "Attacking King"
+    ],
+    "description": "Lure the black king onto the exposed f7 square and recover the minor piece with initiative."
+  },
+  {
+    "id": "puz_0802",
+    "fen": "5rk1/5ppp/8/8/8/5N2/5PPP/4R1K1 b - - 0 1",
+    "moves": [
+      "f8d8",
+      "e1e7",
+      "g8f8",
+      "e7c7"
+    ],
+    "rating": 840,
+    "ratingDeviation": 60,
+    "themes": [
+      "Rook 7th Rank",
+      "Endgame",
+      "Quiet Positional Move"
+    ],
+    "description": "Seize the absolute 7th rank with the rook to tie down the defending king."
+  },
+  {
+    "id": "puz_0803",
+    "fen": "r1b2rk1/pp3ppp/2n1p3/3pP3/1b1P4/1PN1PN2/1P4PP/R1B2RK1 b - - 0 13",
+    "moves": [
+      "b4c3",
+      "b2c3",
+      "c8d7",
+      "c1a3",
+      "f8c8"
+    ],
+    "rating": 1050,
+    "ratingDeviation": 54,
+    "themes": [
+      "Pin",
+      "Endgame",
+      "Pawn Structure"
+    ],
+    "description": "Trade down into a favorable pawn structure and exploit the backward c-pawn."
+  },
+  {
+    "id": "puz_0804",
+    "fen": "r1b1k2r/pp1n1ppp/2p1pn2/q2p2B1/1bPP4/2N1PN2/PPQ2PPP/R3KB1R b KQkq - 4 8",
+    "moves": [
+      "f6e4",
+      "a1c1",
+      "e4g5",
+      "f3g5",
+      "d5c4"
+    ],
+    "rating": 1120,
+    "ratingDeviation": 52,
+    "themes": [
+      "Pin",
+      "Fork",
+      "Removal of Defender"
+    ],
+    "description": "Exploit the pinned c3 knight to eliminate the active dark-squared bishop."
+  },
+  {
+    "id": "puz_0805",
+    "fen": "4r1k1/pp3ppp/2p5/8/3P4/2P2N2/P1P2PPP/R1B3K1 b - - 0 16",
+    "moves": [
+      "e8e2",
+      "c1d2",
+      "f7f6",
+      "g1f1",
+      "e2e7"
+    ],
+    "rating": 980,
+    "ratingDeviation": 58,
+    "themes": [
+      "Rook 7th Rank",
+      "Trapped Piece",
+      "Prophylaxis"
+    ],
+    "description": "Defend the back rank and trap the overextended rook before it wreaks havoc."
+  },
+  {
+    "id": "puz_0806",
+    "fen": "r4rk1/1pp2ppp/p1np1q2/4p3/2B1P1b1/3P1N2/PPP2PPP/R2Q1RK1 b - - 0 10",
+    "moves": [
+      "c6d4",
+      "f3d4",
+      "g4d1",
+      "a1d1",
+      "e5d4"
+    ],
+    "rating": 1160,
+    "ratingDeviation": 50,
+    "themes": [
+      "Pin",
+      "Queen Sacrifice",
+      "Hanging Piece"
+    ],
+    "description": "Target the absolute pin on f3 to win the white queen in a decisive tactical exchange."
+  },
+  {
+    "id": "puz_0807",
+    "fen": "r1bq1rk1/ppp1bppp/2np1n2/4p3/4P3/2NP1N2/PPP1BPPP/R1BQ1RK1 w - - 4 7",
+    "moves": [
+      "c1e3",
+      "d6d5",
+      "e4d5",
+      "f6d5",
+      "c3d5",
+      "d8d5"
+    ],
+    "rating": 920,
+    "ratingDeviation": 62,
+    "themes": [
+      "Center Control",
+      "Simplification"
+    ],
+    "description": "Break open the center with d5 to liquidate into an active open middlegame."
+  },
+  {
+    "id": "puz_0808",
+    "fen": "5rk1/pp1b1ppp/1q2p3/3pP3/1P1P4/P4N2/2Q2PPP/2R3K1 b - - 0 20",
+    "moves": [
+      "f8c8",
+      "c2c8",
+      "d7c8",
+      "c1c8",
+      "b6d8",
+      "c8d8"
+    ],
+    "rating": 870,
+    "ratingDeviation": 59,
+    "themes": [
+      "Back-Rank Mate",
+      "Deflection",
+      "Removal of Defender"
+    ],
+    "description": "Deflect the guarding pieces to force an unavoidable back-rank checkmate on c8."
+  },
+  {
+    "id": "puz_0809",
+    "fen": "r1b2rk1/pp1n1ppp/2p1pn2/q2p2B1/1bPP4/2N1PN2/PPQ2PPP/2KR1B1R b - - 6 9",
+    "moves": [
+      "b4c3",
+      "b2c3",
+      "f6e4",
+      "c1b2"
+    ],
+    "rating": 980,
+    "ratingDeviation": 52,
+    "themes": [
+      "Fork",
+      "Outpost",
+      "Pawn Structure"
+    ],
+    "description": "Jump the knight into the powerful e4 outpost targeting c3 and f2."
+  },
+  {
+    "id": "puz_0810",
+    "fen": "2r3k1/pp3ppp/8/8/8/1P3N2/P1r2PPP/R3R1K1 b - - 0 1",
+    "moves": [
+      "c2b2",
+      "e1c1",
+      "c8c1",
+      "a1c1",
+      "h7h6"
+    ],
+    "rating": 870,
+    "ratingDeviation": 50,
+    "themes": [
+      "7th Rank",
+      "Simplification",
+      "Luft"
+    ],
+    "description": "Invade the 7th rank with the rook and ensure king safety."
+  },
+  {
+    "id": "puz_0811",
+    "fen": "r1bq1rk1/pp3ppp/2n1pn2/3p4/1bPP4/2NB1N2/PP3PPP/R1BQK2R b KQ - 2 8",
+    "moves": [
+      "d5c4",
+      "d3c4",
+      "f6e4",
+      "e1g1"
+    ],
+    "rating": 1040,
+    "ratingDeviation": 48,
+    "themes": [
+      "Pin",
+      "Double Attack",
+      "Opening Tactic"
+    ],
+    "description": "Liquidate the center pawn and exert dual pressure on the pinned c3 knight."
+  },
+  {
+    "id": "puz_0812",
+    "fen": "r2qk2r/ppp2ppp/2n1b3/2bnp3/2B5/2PP1N2/PP3PPP/RNBQ1RK1 b kq - 2 7",
+    "moves": [
+      "d5f4",
+      "c1f4",
+      "e6c4",
+      "f4e5"
+    ],
+    "rating": 1110,
+    "ratingDeviation": 52,
+    "themes": [
+      "Zwischenzug",
+      "Tactical Bishop Swap",
+      "Initiative"
+    ],
+    "description": "Execute an intermediate exchange before recapturing on c4."
+  },
+  {
+    "id": "puz_0813",
+    "fen": "4r1k1/5ppp/p1q5/1p1R4/8/1QP3P1/PP3P1P/6K1 b - - 0 25",
+    "moves": [
+      "e8e1",
+      "g1g2",
+      "e1d1",
+      "b3d1"
+    ],
+    "rating": 1150,
+    "ratingDeviation": 54,
+    "themes": [
+      "Absolute Pin",
+      "Endgame Tactic",
+      "Heavy Pieces"
+    ],
+    "description": "Pin the white rook to the king and force a decisive simplification."
+  },
+  {
+    "id": "puz_0814",
+    "fen": "r1b1k2r/pp2qppp/2n1pn2/3p4/2PP4/2N2N2/PP2BPPP/R2QK2R b KQkq - 1 9",
+    "moves": [
+      "d5c4",
+      "e2c4",
+      "e8g8",
+      "e1g1"
+    ],
+    "rating": 860,
+    "ratingDeviation": 46,
+    "themes": [
+      "Development",
+      "Castling",
+      "Center Break"
+    ],
+    "description": "Release central tension and castle safely into the middlegame."
+  },
+  {
+    "id": "puz_0815",
+    "fen": "r1bq1rk1/pp2ppbp/2np1np1/8/3NP3/2N1BP2/PPP3PP/2KR1B1R b - - 0 9",
+    "moves": [
+      "c8d7",
+      "h2h4",
+      "c6d4",
+      "e3d4",
+      "d8a5"
+    ],
+    "rating": 1080,
+    "ratingDeviation": 50,
+    "themes": [
+      "Sicilian Defense",
+      "Dragon Counter-attack",
+      "Middlegame"
+    ],
+    "description": "Coordinate queen and dragon bishop for queenside counterplay."
+  },
+  {
+    "id": "puz_0816",
+    "fen": "3r2k1/p4ppp/1p6/8/2P5/1P3P2/P1Q3PP/4r1K1 w - - 0 27",
+    "moves": [
+      "g1f2",
+      "d8d1",
+      "c2f5",
+      "g7g6"
+    ],
+    "rating": 1180,
+    "ratingDeviation": 52,
+    "themes": [
+      "7th Rank Infiltration",
+      "Simplification",
+      "Winning Endgame"
+    ],
+    "description": "Infiltrate with rooks along the 1st rank to dominate the board."
+  },
+  {
+    "id": "puz_0817",
+    "fen": "r1bqk2r/1ppp1ppp/p1n5/2b1p3/B3n3/2P2N2/PP1P1PPP/RNBQR1K1 b kq - 1 7",
+    "moves": [
+      "c5f2",
+      "g1f1",
+      "f2e1",
+      "d1e1"
+    ],
+    "rating": 920,
+    "ratingDeviation": 47,
+    "themes": [
+      "Deflection",
+      "Winning the Exchange",
+      "King Exposure"
+    ],
+    "description": "Snatch the f2 pawn with check and win the rook on e1."
+  },
+  {
+    "id": "puz_0818",
+    "fen": "r1b1k2r/ppp2ppp/2n1p3/3q4/1b1P4/4PN2/PP1B1PPP/R2QKB1R b KQkq - 2 8",
+    "moves": [
+      "b4d2",
+      "d1d2",
+      "e8g8",
+      "f1d3"
+    ],
+    "rating": 890,
+    "ratingDeviation": 45,
+    "themes": [
+      "Piece Trade",
+      "Solidification",
+      "Opening"
+    ],
+    "description": "Trade off dark-squared bishops to relieve queenside pressure."
+  },
+  {
+    "id": "puz_0819",
+    "fen": "4r1k1/5ppp/8/8/8/8/2r2PPP/1R4K1 b - - 0 1",
+    "moves": [
+      "e8c8",
+      "h2h3",
+      "c2c1",
+      "b1c1",
+      "c8c1"
+    ],
+    "rating": 940,
+    "ratingDeviation": 46,
+    "themes": [
+      "Doubled Rooks",
+      "Trade",
+      "Winning Endgame"
+    ],
+    "description": "Double rooks along the c-file to force off all remaining counterplay."
+  },
+  {
+    "id": "puz_0820",
+    "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",
+    "moves": [
+      "f3g5",
+      "d7d5",
+      "e4d5",
+      "c6a5",
+      "c4b5"
+    ],
+    "rating": 1060,
+    "ratingDeviation": 50,
+    "themes": [
+      "Fried Liver Attack",
+      "Pressure on f7",
+      "Opening Initiative"
+    ],
+    "description": "Launch the fried liver probe against f7 and maintain pin."
+  },
+  {
+    "id": "puz_0821",
+    "fen": "r1bq1rk1/pp3ppp/2n1pn2/2pp4/2PP4/2NBPN2/PP3PPP/R1BQK2R w KQ - 0 8",
+    "moves": [
+      "e1g1",
+      "c5d4",
+      "e3d4",
+      "d5c4",
+      "d3c4"
+    ],
+    "rating": 830,
+    "ratingDeviation": 45,
+    "themes": [
+      "Opening Recapture",
+      "Central Tension",
+      "IQP Development"
+    ],
+    "description": "Castle and recapture in the center with bishop tempo."
+  },
+  {
+    "id": "puz_0822",
+    "fen": "2r3k1/pp3ppp/8/8/8/1P3N2/P1r2PPP/3RR1K1 b - - 0 1",
+    "moves": [
+      "c2a2",
+      "d1d7",
+      "b7b6",
+      "e1e7"
+    ],
+    "rating": 910,
+    "ratingDeviation": 47,
+    "themes": [
+      "Pawn Grab",
+      "7th Rank Counter",
+      "Endgame"
+    ],
+    "description": "Snatch the weak a2 pawn and safeguard the b7 flank."
+  },
+  {
+    "id": "puz_0823",
+    "fen": "r1bqk2r/pppp1ppp/2n5/4p3/2B1n3/3P1N2/PPP2PPP/RNBQK2R b KQkq - 0 5",
+    "moves": [
+      "e4f6",
+      "c1g5",
+      "h7h6",
+      "g5f6",
+      "d8f6"
+    ],
+    "rating": 850,
+    "ratingDeviation": 43,
+    "themes": [
+      "Knight Retreat",
+      "Pin Neutralization",
+      "Recapture"
+    ],
+    "description": "Retreat knight safely to f6 and recapture with the queen."
+  },
+  {
+    "id": "puz_0824",
+    "fen": "r1b2rk1/pp1n1ppp/2p1pn2/q5B1/2PP4/2N2N2/PP1QBPPP/R3K2R b KQ - 4 10",
+    "moves": [
+      "f8e8",
+      "e1g1",
+      "e6e5",
+      "d4e5",
+      "d7e5"
+    ],
+    "rating": 970,
+    "ratingDeviation": 48,
+    "themes": [
+      "Central Break",
+      "Recapture",
+      "Middlegame Initiative"
+    ],
+    "description": "Strike the center with e5 and recapture with the knight."
+  },
+  {
+    "id": "puz_0825",
+    "fen": "r2qk2r/ppp2ppp/2n1b3/2b1p3/2B5/3P1N2/PPP2PPP/RNBQ1RK1 b kq - 0 7",
+    "moves": [
+      "e6c4",
+      "d3c4",
+      "d8d1",
+      "f1d1"
+    ],
+    "rating": 1020,
+    "ratingDeviation": 46,
+    "themes": [
+      "Queen Exchange",
+      "Doubled Pawns Inflicted",
+      "Endgame Transition"
+    ],
+    "description": "Trade off queens and ruin white's pawn symmetry."
+  },
+  {
+    "id": "puz_0826",
+    "fen": "r1bq1rk1/ppp2ppp/2n5/3np3/1b6/2NP1N2/PPPBBPPP/R2QK2R w KQ - 2 8",
+    "moves": [
+      "e1g1",
+      "b4c3",
+      "b2c3",
+      "f8e8"
+    ],
+    "rating": 880,
+    "ratingDeviation": 42,
+    "themes": [
+      "Solid Development",
+      "Castling",
+      "Rook Activation"
+    ],
+    "description": "Safeguard the king and absorb the minor piece exchange."
+  }
+]
