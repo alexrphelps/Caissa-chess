@@ -142,7 +142,7 @@ export interface AISearchResult {
   config?: ChessEngineConfig;
 }
 
-export type ShellState = 'title' | 'playing' | 'paused' | 'gameover' | 'puzzles';
+export type ShellState = 'title' | 'playing' | 'paused' | 'gameover' | 'puzzles' | 'replay';
 
 export interface MoveRecord {
   move: Move;

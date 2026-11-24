@@ -31,6 +31,7 @@ interface TitleScreenProps {
   onOpenSavedGames?: () => void;
   onResumeActiveGame?: () => void;
   onOpenPuzzles?: () => void;
+  onOpenMasterGames?: () => void;
   onStartGame: () => void;
 }
 
@@ -48,6 +49,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   onOpenSavedGames,
   onResumeActiveGame,
   onOpenPuzzles,
+  onOpenMasterGames,
   onStartGame,
 }) => {
   const [hoveredPiece, setHoveredPiece] = useState<number | null>(null);
@@ -93,13 +95,23 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         <span className="text-xs tracking-[0.22em] uppercase text-[#A69F91] font-medium">
           FIDE Rules Standard · 8×8 Algebraic Board
         </span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          {onOpenMasterGames && (
+            <button
+              type="button"
+              data-testid="title-top-master-games-btn"
+              onClick={onOpenMasterGames}
+              className="px-2.5 py-1 rounded-md bg-[#1C2621] hover:bg-[#27372E] border border-[#C6923A]/50 text-xs font-mono text-[#EADBC8] hover:text-[#F4EFE6] transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <span>Master Games & PGN</span>
+            </button>
+          )}
           {onOpenSavedGames && (
             <button
               type="button"
               data-testid="title-open-saved-games-btn"
               onClick={onOpenSavedGames}
-              className="px-2.5 py-1 rounded-md bg-[#1C2621] hover:bg-[#27372E] border border-[#C6923A]/40 text-xs font-mono text-[#EADBC8] hover:text-[#F4EFE6] transition-colors cursor-pointer flex items-center gap-1.5"
+              className="px-2.5 py-1 rounded-md bg-[#1C2621] hover:bg-[#27372E] border border-[#C6923A]/40 text-xs font-mono text-[#EADBC8] hover:text-[#F4EFE6] transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
             >
               <span className="text-[#C6923A]">📁</span>
               <span>Saved Games</span>
@@ -110,7 +122,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               )}
             </button>
           )}
-          <span className="text-xs font-mono text-[#A69F91] tabular-nums hidden sm:inline">
+          <span className="text-xs font-mono text-[#A69F91] tabular-nums hidden md:inline">
             STD · 400–2400 ELO ENGINE
           </span>
         </div>
@@ -405,8 +417,8 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               </div>
             )}
 
-            {/* Primary Start & Saved Games Action Row */}
-            <div className="pt-1 flex flex-col sm:flex-row items-center gap-2.5">
+            {/* Primary Start & Mode Actions */}
+            <div className="pt-1 space-y-2.5">
               <button
                 type="button"
                 data-start="true"
@@ -414,42 +426,52 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                   e.currentTarget.blur();
                   onStartGame();
                 }}
-                className="flex-1 w-full py-3.5 px-6 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] active:bg-[#B5822D] text-[#111815] font-bold text-base tracking-wide transition-transform duration-150 cursor-pointer shadow-[0_6px_20px_rgba(198,146,58,0.28)] whitespace-nowrap shrink-0 text-center"
+                className="w-full py-3.5 px-6 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] active:bg-[#B5822D] text-[#111815] font-bold text-base tracking-wide transition-transform duration-150 cursor-pointer shadow-[0_6px_20px_rgba(198,146,58,0.28)] whitespace-nowrap text-center"
               >
                 Start New Match
               </button>
 
-              {onOpenPuzzles && (
-                <button
-                  type="button"
-                  data-testid="title-puzzles-btn"
-                  onClick={onOpenPuzzles}
-                  className="w-full sm:w-auto py-3.5 px-5 rounded-lg bg-[#162B21] hover:bg-[#1E3B2D] border border-emerald-500/50 text-xs font-mono font-bold text-emerald-300 hover:text-emerald-200 transition-colors cursor-pointer whitespace-nowrap shrink-0 flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(16,185,129,0.18)]"
-                >
-                  <span className="text-emerald-400">⚡</span>
-                  <span>Tactical Puzzles</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    Adaptive
-                  </span>
-                </button>
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {onOpenMasterGames && (
+                  <button
+                    type="button"
+                    data-testid="title-master-games-btn"
+                    onClick={onOpenMasterGames}
+                    className="py-2.5 px-3.5 rounded-lg bg-[#1D2A23] hover:bg-[#26382E] border border-[#C6923A]/60 text-xs font-mono font-bold text-[#EADBC8] hover:text-[#F4EFE6] transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5"
+                  >
+                    <span>Master Games</span>
+                  </button>
+                )}
 
-              {onOpenSavedGames && (
-                <button
-                  type="button"
-                  data-testid="title-saved-games-btn"
-                  onClick={onOpenSavedGames}
-                  className="w-full sm:w-auto py-3.5 px-5 rounded-lg bg-[#1D2A23] hover:bg-[#25352C] border border-[#34463C] text-xs font-mono font-semibold text-[#EADBC8] hover:text-[#F4EFE6] transition-colors cursor-pointer whitespace-nowrap shrink-0 flex items-center justify-center gap-1.5"
-                >
-                  <span className="text-[#C6923A]">📁</span>
-                  <span>Saved Games</span>
-                  {savedSessionsCount > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-[#C6923A] text-[#111815] text-[10px] font-bold">
-                      {savedSessionsCount}
-                    </span>
-                  )}
-                </button>
-              )}
+                {onOpenPuzzles && (
+                  <button
+                    type="button"
+                    data-testid="title-puzzles-btn"
+                    onClick={onOpenPuzzles}
+                    className="py-2.5 px-3.5 rounded-lg bg-[#162B21] hover:bg-[#1E3B2D] border border-emerald-500/50 text-xs font-mono font-bold text-emerald-300 hover:text-emerald-200 transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5"
+                  >
+                    <span className="text-emerald-400">⚡</span>
+                    <span>Tactical Puzzles</span>
+                  </button>
+                )}
+
+                {onOpenSavedGames && (
+                  <button
+                    type="button"
+                    data-testid="title-saved-games-btn"
+                    onClick={onOpenSavedGames}
+                    className="py-2.5 px-3.5 rounded-lg bg-[#1D2A23] hover:bg-[#25352C] border border-[#34463C] text-xs font-mono font-semibold text-[#EADBC8] hover:text-[#F4EFE6] transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5"
+                  >
+                    <span className="text-[#C6923A]">📁</span>
+                    <span>Saved Games</span>
+                    {savedSessionsCount > 0 && (
+                      <span className="text-[11px] font-bold text-[#C6923A] tabular-nums">
+                        ({savedSessionsCount})
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

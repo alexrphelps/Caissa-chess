@@ -66,6 +66,9 @@ export interface SharedHudProps {
   onSaveCurrentSession?: () => void;
   savedSessionsCount?: number;
   onOpenPuzzles?: () => void;
+  onOpenMasterGames?: () => void;
+  replayBranchLabel?: string | null;
+  onReturnToOriginalReplay?: () => void;
   onOpenGameReview?: () => void;
   onCopyFen?: () => void;
   onCopyPgn?: () => void;
@@ -296,6 +299,9 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
   onSaveCurrentSession,
   savedSessionsCount = 0,
   onOpenPuzzles,
+  onOpenMasterGames,
+  replayBranchLabel,
+  onReturnToOriginalReplay,
   onOpenGameReview,
   onCopyFen,
   onCopyPgn,
@@ -678,17 +684,64 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
             <span>Undo</span>
           </button>
 
+          {/* Quick Action: Return to Original Replay (when branched from a PGN replay) */}
+          {replayBranchLabel && onReturnToOriginalReplay && (
+            <button
+              type="button"
+              data-testid="hud-return-to-replay-btn"
+              aria-label="Return to Original Replay"
+              onClick={onReturnToOriginalReplay}
+              title={`Return to original replay: ${replayBranchLabel}`}
+              className="h-[44px] px-2.5 rounded-xl border bg-[#292215] hover:bg-[#382E1C] border-[#C6923A] text-[#F4EFE6] flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 text-xs font-semibold whitespace-nowrap"
+            >
+              <span className="text-[#C6923A]" aria-hidden="true">
+                ↩
+              </span>
+              <span className="2xl:hidden">Replay</span>
+              <span className="hidden 2xl:inline">Return to Replay</span>
+            </button>
+          )}
+
+          {/* Quick Action: Master Games Library & PGN Import */}
+          {onOpenMasterGames && (
+            <button
+              type="button"
+              data-testid="hud-master-games-btn"
+              aria-label="Master Games Library and PGN Replay"
+              onClick={onOpenMasterGames}
+              title="Master Games Library & PGN Replay"
+              className="w-[44px] h-[44px] rounded-xl border bg-[#212E27] hover:bg-[#2C3D34] border-[#C6923A]/55 hover:border-[#C6923A] text-[#EADBC8] hover:text-[#F4EFE6] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="w-4 h-4 text-[#C6923A]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+              </svg>
+            </button>
+          )}
+
           {/* Quick Action: Tactical Puzzles Mode */}
           {onOpenPuzzles && (
             <button
               type="button"
               data-testid="hud-puzzles-btn"
+              aria-label="Tactical Puzzles"
               onClick={onOpenPuzzles}
               title="Tactical Puzzles (Adaptive Rush)"
-              className="h-[44px] px-2.5 sm:px-3 rounded-xl border bg-[#162B21] hover:bg-[#1E3B2D] border-emerald-500/50 text-emerald-300 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 text-xs font-mono font-bold whitespace-nowrap"
+              className="h-[44px] min-w-[44px] px-2.5 rounded-xl border bg-[#162B21] hover:bg-[#1E3B2D] border-emerald-500/50 text-emerald-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 text-xs font-mono font-bold whitespace-nowrap"
             >
-              <span>⚡</span>
-              <span className="hidden md:inline">Puzzles</span>
+              <span aria-hidden="true">⚡</span>
+              <span className="hidden md:inline xl:hidden 2xl:inline">
+                Puzzles
+              </span>
             </button>
           )}
 
@@ -990,6 +1043,23 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                     <span>Board Theme & Layout Customizer</span>
                     <span className="text-[10px] font-mono text-[#C6923A] font-bold">
                       Customize
+                    </span>
+                  </button>
+                )}
+
+                {onOpenMasterGames && (
+                  <button
+                    type="button"
+                    data-testid="options-master-games-btn"
+                    onClick={() => {
+                      setOpenPopover(null);
+                      onOpenMasterGames();
+                    }}
+                    className="w-full h-8 px-3 rounded-lg bg-[#242117] hover:bg-[#312C1D] border border-[#C6923A]/55 text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
+                  >
+                    <span>Master Games & PGN Replay</span>
+                    <span className="text-[10px] font-mono text-[#C6923A] font-bold">
+                      Library
                     </span>
                   </button>
                 )}

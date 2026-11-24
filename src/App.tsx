@@ -71,6 +71,11 @@ import {
   Square,
   StoredGameSession,
 } from './chess/types';
+import {
+  buildStateStackUpToPly,
+  formatPgnGameSummary,
+} from './chess/pgnParser';
+import { ParsedPgnGame, ReplayBranchOrigin } from './chess/pgnTypes';
 import { BoardCustomizerModal } from './components/BoardCustomizerModal';
 import { ChessBoard } from './components/ChessBoard';
 import { EngineCustomizerModal } from './components/EngineCustomizerModal';
@@ -80,7 +85,9 @@ import {
   TopHeaderBar,
   UnderBoardPlayerStrip,
 } from './components/GameHud';
+import { MasterGamesModal } from './components/MasterGamesModal';
 import { PuzzleModeView } from './components/PuzzleModeView';
+import { ReplayModeView } from './components/ReplayModeView';
 import { SavedGamesModal } from './components/SavedGamesModal';
 import { StatusModal } from './components/StatusModal';
 import { TitleScreen } from './components/TitleScreen';
@@ -190,6 +197,18 @@ export default function App() {
   const [isBoardCustomizerOpen, setIsBoardCustomizerOpen] =
     useState<boolean>(false);
 
+  // Master Games Library & PGN Replay State
+  const [isMasterGamesOpen, setIsMasterGamesOpen] = useState<boolean>(false);
+  const [activeReplayGame, setActiveReplayGame] =
+    useState<ParsedPgnGame | null>(null);
+  const [replayInitialPly, setReplayInitialPly] = useState<number>(0);
+  const [importedPgnBatch, setImportedPgnBatch] = useState<ParsedPgnGame[]>([]);
+  const [replayBranchOrigin, setReplayBranchOrigin] =
+    useState<ReplayBranchOrigin | null>(null);
+  const [replayReturnShell, setReplayReturnShell] = useState<
+    'title' | 'playing'
+  >('title');
+
   // Persisted UI & Board Layout Preferences (theme, coordinates, scale, Tactical Coach split width)
   const [uiPrefs, setUiPrefs] = useState<UILayoutPreferences>(() =>
     loadUILayoutPreferences()
@@ -251,7 +270,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (shellState === 'title' || shellState === 'puzzles') return;
+    if (
+      shellState === 'title' ||
+      shellState === 'puzzles' ||
+      shellState === 'replay'
+    ) {
+      return;
+    }
     const node = arenaRef.current;
     if (!node) return;
 
@@ -954,6 +979,7 @@ export default function App() {
       setIsGameReviewOpen(false);
       setGameReviewReport(null);
       setRetryBlunderSession(null);
+      setReplayBranchOrigin(null);
       const initialStack = [createInitialGameState()];
       setStateStack(initialStack);
       const nextFlipped = nextMode === 'ai' ? nextColor === 'b' : isFlipped;
@@ -986,6 +1012,89 @@ export default function App() {
     setShellState('puzzles');
     document.body.dataset.state = 'puzzles';
   }, [clearPendingTimers]);
+
+  const handleOpenMasterGamesModal = useCallback(() => {
+    if (shellState === 'title' || shellState === 'playing') {
+      setReplayReturnShell(shellState);
+    }
+    setIsMasterGamesOpen(true);
+  }, [shellState]);
+
+  const handleSelectReplayGame = useCallback(
+    (game: ParsedPgnGame, startPly = 0) => {
+      clearPendingTimers();
+      setIsAIThinking(false);
+      setSelectedSquare(null);
+      setPendingPromotion(null);
+      setHighlightedHelperRank(null);
+      setPlannedArrows([]);
+      setPreviewPly(null);
+      setInspectingGameOverBoard(false);
+      setIsGameReviewOpen(false);
+      setRetryBlunderSession(null);
+      setActiveReplayGame(game);
+      setReplayInitialPly(startPly);
+      setShellState('replay');
+      document.body.dataset.state = 'replay';
+    },
+    [clearPendingTimers]
+  );
+
+  const handleContinuePlayFromHere = useCallback(
+    (ply: number, chosenPlayerColor: Color, shouldFlip: boolean) => {
+      if (!activeReplayGame) return;
+      const branchStack = buildStateStackUpToPly(activeReplayGame, ply);
+      if (branchStack.length === 0) return;
+
+      clearPendingTimers();
+      setIsAIThinking(false);
+      setLastSearchStats(null);
+      setSelectedSquare(null);
+      setPendingPromotion(null);
+      setHighlightedHelperRank(null);
+      setPlannedArrows([]);
+      setPreviewPly(null);
+      setInspectingGameOverBoard(false);
+      setIsGameReviewOpen(false);
+      setGameReviewReport(null);
+      setRetryBlunderSession(null);
+
+      setStateStack(branchStack);
+      setGameMode('ai');
+      setPlayerColor(chosenPlayerColor);
+      setIsFlipped(shouldFlip);
+      setReplayBranchOrigin({ game: activeReplayGame, branchPly: ply });
+      setShellState('playing');
+      document.body.dataset.state = 'playing';
+
+      const branchSession = createStoredSession({
+        stateStack: branchStack,
+        gameMode: 'ai',
+        playerColor: chosenPlayerColor,
+        isFlipped: shouldFlip,
+        engineProfile,
+        customTitle: `${activeReplayGame.headers.White} vs. ${activeReplayGame.headers.Black} (Ply ${ply})`,
+        isAutoSave: true,
+      });
+      saveActiveSession(branchSession);
+      setActiveSession(branchSession);
+      soundFX.playMove();
+      showToast(
+        `Playing as ${
+          chosenPlayerColor === 'w' ? 'White' : 'Black'
+        } from ply ${ply}`
+      );
+    },
+    [activeReplayGame, clearPendingTimers, engineProfile, showToast]
+  );
+
+  const handleReturnToOriginalReplay = useCallback(() => {
+    if (!replayBranchOrigin) return;
+    handleSelectReplayGame(
+      replayBranchOrigin.game,
+      replayBranchOrigin.branchPly
+    );
+  }, [replayBranchOrigin, handleSelectReplayGame]);
 
   // Auto-save active game session whenever moves are played or game state updates
   useEffect(() => {
@@ -1281,6 +1390,17 @@ export default function App() {
         return;
       }
 
+      if (isMasterGamesOpen) {
+        if (e.key === 'Escape') {
+          setIsMasterGamesOpen(false);
+        }
+        return;
+      }
+
+      if (shellState === 'replay') {
+        return;
+      }
+
       if (isSavedGamesOpen) {
         if (e.key === 'Escape') {
           setIsSavedGamesOpen(false);
@@ -1379,6 +1499,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
     shellState,
+    isMasterGamesOpen,
     isSavedGamesOpen,
     isCustomizerOpen,
     isBoardCustomizerOpen,
@@ -1421,6 +1542,63 @@ export default function App() {
     );
   }
 
+  if (shellState === 'replay' && activeReplayGame) {
+    return (
+      <>
+        <ReplayModeView
+          game={activeReplayGame}
+          initialPly={replayInitialPly}
+          engineProfile={engineProfile}
+          isMuted={isMuted}
+          uiPrefs={uiPrefs}
+          isAnyModalOpen={
+            isMasterGamesOpen || isBoardCustomizerOpen || isCustomizerOpen
+          }
+          onToggleMute={handleToggleMute}
+          onUpdateUiPrefs={updateUiPrefs}
+          onOpenLibrary={() => setIsMasterGamesOpen(true)}
+          onOpenBoardCustomizer={() => setIsBoardCustomizerOpen(true)}
+          onOpenEngineCustomizer={() => setIsCustomizerOpen(true)}
+          onContinuePlayFromHere={handleContinuePlayFromHere}
+          onExit={() => {
+            clearPendingTimers();
+            setIsAIThinking(false);
+            setShellState(replayReturnShell);
+          }}
+        />
+        <MasterGamesModal
+          isOpen={isMasterGamesOpen}
+          onClose={() => setIsMasterGamesOpen(false)}
+          onSelectGame={(game) => handleSelectReplayGame(game, 0)}
+          importedBatch={importedPgnBatch}
+          onUpdateImportedBatch={setImportedPgnBatch}
+        />
+        <BoardCustomizerModal
+          isOpen={isBoardCustomizerOpen}
+          preferences={uiPrefs}
+          currentBoardPx={boardGeometry.boardSizePx}
+          maxFitBoardPx={boardGeometry.maxFitSizePx}
+          onClose={() => setIsBoardCustomizerOpen(false)}
+          onChangePreferences={(patch) => updateUiPrefs(patch, true)}
+          onResetDefaults={resetUiPrefs}
+        />
+        <EngineCustomizerModal
+          isOpen={isCustomizerOpen}
+          engineProfile={engineProfile}
+          savedProfiles={savedProfiles}
+          onClose={() => setIsCustomizerOpen(false)}
+          onChangeElo={handleChangeElo}
+          onSelectPreset={handleSelectPreset}
+          onUpdateCustomConfig={handleUpdateCustomConfig}
+          onSaveProfile={handleSaveCustomProfile}
+          onLoadProfile={handleLoadCustomProfile}
+          onDeleteProfile={handleDeleteCustomProfile}
+          onResetToEloDefault={handleResetToEloDefault}
+        />
+      </>
+    );
+  }
+
   if (shellState === 'title') {
     return (
       <>
@@ -1447,7 +1625,15 @@ export default function App() {
             }
           }}
           onOpenPuzzles={handleOpenPuzzles}
+          onOpenMasterGames={handleOpenMasterGamesModal}
           onStartGame={() => startNewMatch()}
+        />
+        <MasterGamesModal
+          isOpen={isMasterGamesOpen}
+          onClose={() => setIsMasterGamesOpen(false)}
+          onSelectGame={(game) => handleSelectReplayGame(game, 0)}
+          importedBatch={importedPgnBatch}
+          onUpdateImportedBatch={setImportedPgnBatch}
         />
         <EngineCustomizerModal
           isOpen={isCustomizerOpen}
@@ -1549,6 +1735,15 @@ export default function App() {
         onOpenPause={() => setShellState('paused')}
         onToggleMute={handleToggleMute}
         onOpenPuzzles={handleOpenPuzzles}
+        onOpenMasterGames={handleOpenMasterGamesModal}
+        replayBranchLabel={
+          replayBranchOrigin
+            ? formatPgnGameSummary(replayBranchOrigin.game)
+            : null
+        }
+        onReturnToOriginalReplay={
+          replayBranchOrigin ? handleReturnToOriginalReplay : undefined
+        }
         onOpenGameReview={handleOpenGameReview}
         onCopyFen={handleCopyCurrentFen}
         onCopyPgn={handleCopyCurrentPgn}
@@ -1946,6 +2141,15 @@ export default function App() {
           </div>
         </aside>
       )}
+
+      {/* Master Games Library & PGN Import Modal */}
+      <MasterGamesModal
+        isOpen={isMasterGamesOpen}
+        onClose={() => setIsMasterGamesOpen(false)}
+        onSelectGame={(game) => handleSelectReplayGame(game, 0)}
+        importedBatch={importedPgnBatch}
+        onUpdateImportedBatch={setImportedPgnBatch}
+      />
 
       {/* Saved Game Sessions Modal */}
       <SavedGamesModal

@@ -66,6 +66,7 @@ interface ChessBoardProps {
   isResizable?: boolean;
   onBoardScaleChange?: (nextScale: number) => void;
   onResetBoardScale?: () => void;
+  onDisabledInteractionAttempt?: (square: Square) => void;
 }
 
 const RANK_ARROW_STYLES: Record<
@@ -150,6 +151,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   isResizable = false,
   onBoardScaleChange,
   onResetBoardScale,
+  onDisabledInteractionAttempt,
 }) => {
   const boardGridRef = useRef<HTMLDivElement | null>(null);
   const ghostPieceRef = useRef<HTMLDivElement | null>(null);
@@ -793,6 +795,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                         setRightClickOrigin(null);
                         if (!isInteractionDisabled) {
                           onSquareClick(square);
+                        } else if (onDisabledInteractionAttempt && piece) {
+                          onDisabledInteractionAttempt(square);
                         }
                       }}
                       className={`relative w-full h-full flex items-center justify-center p-0 border-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#111815] transition-colors duration-100 ${
