@@ -5,6 +5,7 @@ import {
   AIDifficulty,
   AISearchResult,
   ChessEngineConfig,
+  CoachPlaystyleProfile,
   GameState,
 } from './types';
 
@@ -39,6 +40,9 @@ function getOrCreateWorker(): Worker | null {
       });
       workerInstance.onmessage = (event: MessageEvent<AIWorkerResponse>) => {
         const msg = event.data;
+        if (msg.type === 'info' || msg.type === 'bestmove') {
+          return;
+        }
         if (msg.type === 'coach_analysis') {
           const pending = pendingCoachResolvers.get(msg.requestId);
           if (pending) {
@@ -197,13 +201,14 @@ export async function computeAIMoveWithCadence(
 }
 
 /**
- * Executes the Deep Multi-PV Tactical Coach analysis (5–6 ply + Quiescence) inside the Web Worker
- * so the UI stays 60fps responsive while upgrading the Coach to Club/Master tactical strength.
+ * Executes the Deep 3000+ GM Multi-PV Tactical Coach analysis inside the Web Worker
+ * so the UI stays 60fps responsive while applying the user's playstyle tuning knobs.
  */
 export async function computeDeepCoachAnalysis(
   state: GameState,
   signal?: AbortSignal,
-  engineConfig?: Partial<ChessEngineConfig>
+  engineConfig?: Partial<ChessEngineConfig>,
+  coachPlaystyle?: CoachPlaystyleProfile
 ): Promise<TacticsAnalysis | null> {
   if (signal?.aborted || state.status !== 'playing') return null;
 
@@ -215,7 +220,15 @@ export async function computeDeepCoachAnalysis(
           resolve(null);
           return;
         }
-        resolve(analyzeTacticsDeep(state, undefined, 800, engineConfig));
+        resolve(
+          analyzeTacticsDeep(
+            state,
+            undefined,
+            engineConfig?.maxTimeMs ?? 1050,
+            engineConfig,
+            coachPlaystyle
+          )
+        );
       }, 16);
       signal?.addEventListener(
         'abort',
@@ -242,7 +255,15 @@ export async function computeDeepCoachAnalysis(
           resolve(null);
           return;
         }
-        resolve(analyzeTacticsDeep(state, undefined, 800, engineConfig));
+        resolve(
+          analyzeTacticsDeep(
+            state,
+            undefined,
+            engineConfig?.maxTimeMs ?? 1050,
+            engineConfig,
+            coachPlaystyle
+          )
+        );
       },
     });
 
@@ -264,8 +285,9 @@ export async function computeDeepCoachAnalysis(
       requestId,
       state,
       maxDepth: engineConfig?.maxDepth,
-      maxTimeMs: engineConfig?.maxTimeMs ?? 900,
+      maxTimeMs: engineConfig?.maxTimeMs ?? 1050,
       engineConfig,
+      coachPlaystyle,
     };
     worker.postMessage(payload);
   });

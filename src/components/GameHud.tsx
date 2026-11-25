@@ -9,6 +9,17 @@ import {
   MAX_ENGINE_ELO,
   MIN_ENGINE_ELO,
 } from '../chess/evaluation';
+import {
+  COACH_ENGINE_RATING_LABEL,
+  COACH_KNOB_MAX,
+  COACH_KNOB_MIN,
+  COACH_KNOB_STEP,
+  COACH_PLAYSTYLE_KNOB_META,
+  COACH_PLAYSTYLE_PRESETS,
+  DEFAULT_COACH_PLAYSTYLE,
+  describeCoachPlaystyle,
+  isBalancedPlaystyle,
+} from '../chess/coachPlaystyle';
 import { OpeningAnalysisResult } from '../chess/openingBook';
 import { OpeningPrinciplesReport } from '../chess/openingAssistant';
 import { RecommendedMove, TacticsAnalysis } from '../chess/tacticsHelper';
@@ -16,6 +27,9 @@ import {
   AIDifficulty,
   AIPresetId,
   AISearchResult,
+  CoachPlaystyleKnobs,
+  CoachPlaystylePresetId,
+  CoachPlaystyleProfile,
   Color,
   EngineProfileState,
   GameMode,
@@ -401,9 +415,9 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
     {
       id: 'club',
       legacyDiff: 'club',
-      label: 'Master',
-      eloBadge: '2200',
-      title: 'Master (2200 Elo) — Deep classical search with NMP, LMR & TT',
+      label: 'GM 3000',
+      eloBadge: '3000',
+      title: 'Grandmaster (3000+ Elo) — 0x88 PVS + 64MB TT + Aspiration + NMP/LMR/RFP + PeSTO Eval',
     },
   ];
 
@@ -547,7 +561,7 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                   type="button"
                   data-testid="hud-open-customizer-btn"
                   onClick={onOpenCustomizer}
-                  title="Open Granular AI Engine Customizer & Custom Profiles (400–2400 Elo)"
+                  title="Open Granular AI Engine Customizer & Custom Profiles (400–3000 Elo)"
                   className={`ml-1 px-2 py-1 rounded-lg text-[11px] font-mono font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1 border ${
                     engineProfile?.isCustom ||
                     engineProfile?.presetId === 'custom' ||
@@ -1677,6 +1691,15 @@ export const TacticalCoachPanel: React.FC<{
   playerColor?: Color;
   panelWidthPx?: number;
   isDesktopSplit?: boolean;
+  coachPlaystyle?: CoachPlaystyleProfile;
+  onSelectCoachPlaystylePreset?: (
+    presetId: Exclude<CoachPlaystylePresetId, 'custom'>
+  ) => void;
+  onChangeCoachPlaystyleKnob?: (
+    key: keyof CoachPlaystyleKnobs,
+    value: number
+  ) => void;
+  onResetCoachPlaystyle?: () => void;
   onToggleHelperMode: () => void;
   onToggleBoardSuggestions: () => void;
   onHoverHelperRank: (rank: 1 | 2 | 3 | null) => void;
@@ -1693,13 +1716,22 @@ export const TacticalCoachPanel: React.FC<{
   playerColor = 'w',
   panelWidthPx,
   isDesktopSplit = false,
+  coachPlaystyle = DEFAULT_COACH_PLAYSTYLE,
+  onSelectCoachPlaystylePreset,
+  onChangeCoachPlaystyleKnob,
+  onResetCoachPlaystyle,
   onToggleHelperMode,
   onToggleBoardSuggestions,
   onHoverHelperRank,
   onPlayRecommendedMove,
   onHidePanel,
 }) => {
-  const [activeTab, setActiveTab] = useState<'tactics' | 'principles' | 'opening'>('tactics');
+  const [activeTab, setActiveTab] = useState<
+    'tactics' | 'style' | 'principles' | 'opening'
+  >('tactics');
+
+  const playstyleInfo = describeCoachPlaystyle(coachPlaystyle);
+  const isDefaultStyle = isBalancedPlaystyle(coachPlaystyle);
 
   // Preserve last valid analysis during AI calculation so the Coach Studio never collapses or flickers
   const cachedAnalysisRef = useRef<TacticsAnalysis | null>(null);
@@ -1754,9 +1786,12 @@ export const TacticalCoachPanel: React.FC<{
             <span
               data-testid="coach-engine-depth-badge"
               className="text-[11px] font-mono text-[#C6923A] font-semibold whitespace-nowrap tabular-nums"
-              title={`64-bit Zobrist Multi-PV + NMP + LMR + Quiescence Checks (${displayAnalysis.searchNodes.toLocaleString()} nodes, ${displayAnalysis.ttHits.toLocaleString()} TT hits in ${displayAnalysis.elapsedMs}ms · Phase ${displayAnalysis.evalBreakdown.gamePhase}/24)`}
+              title={`${
+                displayAnalysis.engineRatingLabel || COACH_ENGINE_RATING_LABEL
+              } 0x88 PVS + 64-bit Zobrist TT + NMP + LMR + Quiescence (${displayAnalysis.searchNodes.toLocaleString()} nodes, ${displayAnalysis.ttHits.toLocaleString()} TT hits in ${displayAnalysis.elapsedMs}ms · Phase ${displayAnalysis.evalBreakdown.gamePhase}/24)`}
             >
-              · {displayAnalysis.searchDepth}p+Q
+              · {displayAnalysis.engineRatingLabel || COACH_ENGINE_RATING_LABEL} ·{' '}
+              {displayAnalysis.searchDepth}p+Q
             </span>
           )}
         </div>
@@ -1873,11 +1908,11 @@ export const TacticalCoachPanel: React.FC<{
         )}
       </div>
 
-      {/* Tabbed Navigation: Live Tactics vs. Opening Principles vs. Opening Strategy */}
+      {/* Tabbed Navigation: Live Tactics, Playstyle Tuning, Opening Principles & ECO Book */}
       <div
         role="tablist"
         aria-label="Coach Study Views"
-        className="grid grid-cols-3 gap-1 p-1 bg-[#121A16] border border-[#24332B] rounded-xl shrink-0"
+        className="grid grid-cols-4 gap-1 p-1 bg-[#121A16] border border-[#24332B] rounded-xl shrink-0"
       >
         <button
           type="button"
@@ -1885,7 +1920,7 @@ export const TacticalCoachPanel: React.FC<{
           aria-selected={activeTab === 'tactics'}
           data-testid="coach-tab-tactics"
           onClick={() => setActiveTab('tactics')}
-          className={`py-1.5 px-1.5 @[520px]/coach:py-2 @[520px]/coach:px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex flex-col @[520px]/coach:flex-row items-center justify-center gap-0.5 @[520px]/coach:gap-1 min-w-0 ${
+          className={`py-1.5 px-1 @[520px]/coach:py-2 @[520px]/coach:px-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex flex-col items-center justify-center gap-0.5 min-w-0 ${
             activeTab === 'tactics'
               ? 'bg-[#C6923A] text-[#111815] font-bold shadow-xs'
               : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#1B2721]'
@@ -1897,7 +1932,33 @@ export const TacticalCoachPanel: React.FC<{
               activeTab === 'tactics' ? 'text-[#111815]/80' : 'text-[#857F72]'
             }`}
           >
-            <span className="hidden @[520px]/coach:inline">· </span>Top 3
+            Top 3
+          </span>
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'style'}
+          data-testid="coach-tab-style"
+          onClick={() => setActiveTab('style')}
+          className={`py-1.5 px-1 @[520px]/coach:py-2 @[520px]/coach:px-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex flex-col items-center justify-center gap-0.5 min-w-0 ${
+            activeTab === 'style'
+              ? 'bg-[#C6923A] text-[#111815] font-bold shadow-xs'
+              : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#1B2721]'
+          }`}
+        >
+          <span className="whitespace-nowrap">Style</span>
+          <span
+            className={`text-[10px] font-mono truncate max-w-full ${
+              activeTab === 'style'
+                ? 'text-[#111815]/85 font-bold'
+                : playstyleInfo.isCustomized
+                ? 'text-[#C6923A] font-semibold'
+                : 'text-[#857F72]'
+            }`}
+          >
+            {playstyleInfo.shortTag}
           </span>
         </button>
 
@@ -1907,7 +1968,7 @@ export const TacticalCoachPanel: React.FC<{
           aria-selected={activeTab === 'principles'}
           data-testid="coach-tab-principles"
           onClick={() => setActiveTab('principles')}
-          className={`py-1.5 px-1.5 @[520px]/coach:py-2 @[520px]/coach:px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex flex-col @[520px]/coach:flex-row items-center justify-center gap-0.5 @[520px]/coach:gap-1 min-w-0 ${
+          className={`py-1.5 px-1 @[520px]/coach:py-2 @[520px]/coach:px-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex flex-col items-center justify-center gap-0.5 min-w-0 ${
             activeTab === 'principles'
               ? 'bg-[#C6923A] text-[#111815] font-bold shadow-xs'
               : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#1B2721]'
@@ -1921,7 +1982,6 @@ export const TacticalCoachPanel: React.FC<{
                 : 'text-[#22C55E]'
             }`}
           >
-            <span className="hidden @[520px]/coach:inline">· </span>
             {openingPrinciplesReport?.grade ?? 'Guide'}
           </span>
         </button>
@@ -1932,7 +1992,7 @@ export const TacticalCoachPanel: React.FC<{
           aria-selected={activeTab === 'opening'}
           data-testid="coach-tab-opening"
           onClick={() => setActiveTab('opening')}
-          className={`py-1.5 px-1.5 @[520px]/coach:py-2 @[520px]/coach:px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex flex-col @[520px]/coach:flex-row items-center justify-center gap-0.5 @[520px]/coach:gap-1 min-w-0 ${
+          className={`py-1.5 px-1 @[520px]/coach:py-2 @[520px]/coach:px-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex flex-col items-center justify-center gap-0.5 min-w-0 ${
             activeTab === 'opening'
               ? 'bg-[#C6923A] text-[#111815] font-bold shadow-xs'
               : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#1B2721]'
@@ -1944,7 +2004,6 @@ export const TacticalCoachPanel: React.FC<{
               activeTab === 'opening' ? 'text-[#111815]/80' : 'text-[#857F72]'
             }`}
           >
-            <span className="hidden @[520px]/coach:inline">· </span>
             {openingAnalysis.eco}
           </span>
         </button>
@@ -1996,6 +2055,28 @@ export const TacticalCoachPanel: React.FC<{
               </div>
               <span className="text-xs text-[#C6923A] font-semibold hover:underline shrink-0">
                 Milestones →
+              </span>
+            </button>
+          )}
+
+          {/* Active Playstyle Bias Strip (visible whenever user has tuned away from Balanced) */}
+          {playstyleInfo.isCustomized && (
+            <button
+              type="button"
+              data-testid="coach-active-style-strip"
+              onClick={() => setActiveTab('style')}
+              className="w-full px-3 py-1.5 rounded-lg bg-[#141D18] hover:bg-[#1A2620] border border-[#2F3E34] flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-xs transition-colors cursor-pointer shrink-0 text-left"
+            >
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+                <span className="text-[#C6923A] font-semibold">
+                  Style: {playstyleInfo.label}
+                </span>
+                <span className="font-mono text-[11px] text-[#A69F91] tabular-nums">
+                  {playstyleInfo.focusSummary}
+                </span>
+              </div>
+              <span className="text-xs font-mono text-[#C6923A] font-semibold shrink-0">
+                Tune →
               </span>
             </button>
           )}
@@ -2137,6 +2218,14 @@ export const TacticalCoachPanel: React.FC<{
                     <p className="text-xs @[420px]/coach:text-sm leading-snug text-[#F4EFE6] font-medium break-words">
                       {activeCoachRec.coachWhy}
                     </p>
+                    {activeCoachRec.playstyleNote && (
+                      <p
+                        data-testid="coach-playstyle-alignment-note"
+                        className="text-xs leading-snug text-[#C6923A] font-medium pt-0.5 break-words"
+                      >
+                        {activeCoachRec.playstyleNote}
+                      </p>
+                    )}
                   </div>
 
                   {/* Next-Turn Follow-Up & Principal Variation Line */}
@@ -2296,9 +2385,151 @@ export const TacticalCoachPanel: React.FC<{
             )}
           </div>
         </div>
+      ) : activeTab === 'style' ? (
+        /* ====================================================================
+         * TAB 2: TACTICAL COACH PLAYSTYLE TUNING (3000+ GM ENGINE ALWAYS ON)
+         * ================================================================== */
+        <div
+          data-testid="coach-playstyle-panel"
+          className="flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-y-auto pr-0.5"
+        >
+          <div className="space-y-2">
+            {/* Engine Strength Guarantee */}
+            <div className="px-3 py-2 rounded-xl bg-[#121A16] border border-[#26362E] space-y-0.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-[#F4EFE6]">
+                  Coach Playstyle Tuning
+                </span>
+                <span
+                  data-testid="coach-style-rating-indicator"
+                  className="text-[11px] font-mono font-semibold text-[#C6923A] tabular-nums"
+                >
+                  {COACH_ENGINE_RATING_LABEL} · Always Active
+                </span>
+              </div>
+              <p className="text-[11px] text-[#A69F91] leading-snug">
+                Always calculates at 3000+ GM strength regardless of opponent
+                Elo. Adjust weights to steer recommendations toward your style.
+              </p>
+            </div>
+
+            {/* Quick Playstyle Presets */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-[#A69F91]">
+                <span>PLAYSTYLE PRESETS</span>
+                <span className="text-[#C6923A] font-semibold">
+                  {playstyleInfo.label}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 @[400px]/coach:grid-cols-5 gap-1">
+                {COACH_PLAYSTYLE_PRESETS.map((preset) => {
+                  const isActive = coachPlaystyle.presetId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      data-testid={`coach-preset-${preset.id}`}
+                      aria-pressed={isActive}
+                      onClick={() => onSelectCoachPlaystylePreset?.(preset.id)}
+                      className={`px-1.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer border text-center ${
+                        isActive
+                          ? 'bg-[#C6923A] border-[#D4A048] text-[#111815] font-bold'
+                          : 'bg-[#121A16] border-[#26362E] text-[#D6CFC2] hover:text-[#F4EFE6] hover:border-[#3A5044]'
+                      }`}
+                    >
+                      {preset.shortLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Granular Playstyle Sliders */}
+            <div className="px-3 py-2.5 rounded-xl bg-[#121A16] border border-[#26362E] space-y-2.5">
+              {COACH_PLAYSTYLE_KNOB_META.map((knob) => {
+                const value = coachPlaystyle.knobs[knob.key];
+                const pct = Math.round(value * 100);
+                const valColor =
+                  value > 1.05
+                    ? 'text-[#C6923A]'
+                    : value < 0.95
+                    ? 'text-[#94A3B8]'
+                    : 'text-[#F4EFE6]';
+                return (
+                  <div key={knob.key} className="space-y-0.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <label
+                        htmlFor={`coach-knob-${knob.key}`}
+                        className="text-xs font-semibold text-[#F4EFE6]"
+                      >
+                        {knob.label}
+                      </label>
+                      <span
+                        data-testid={`coach-knob-value-${knob.key}`}
+                        className={`text-xs font-mono font-bold tabular-nums ${valColor}`}
+                      >
+                        {pct}%
+                      </span>
+                    </div>
+                    <input
+                      id={`coach-knob-${knob.key}`}
+                      data-testid={`coach-knob-${knob.key}`}
+                      type="range"
+                      min={COACH_KNOB_MIN}
+                      max={COACH_KNOB_MAX}
+                      step={COACH_KNOB_STEP}
+                      value={value}
+                      onChange={(e) =>
+                        onChangeCoachPlaystyleKnob?.(
+                          knob.key,
+                          Number(e.target.value)
+                        )
+                      }
+                      className="w-full h-1.5 rounded-lg bg-[#223028] accent-[#C6923A] cursor-pointer"
+                    />
+                    <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-[#857F72]">
+                      <span className="whitespace-nowrap shrink-0">{knob.lowLabel}</span>
+                      <span
+                        title={knob.description}
+                        className="truncate text-[#989182] font-sans text-center"
+                      >
+                        {knob.description}
+                      </span>
+                      <span className="whitespace-nowrap shrink-0">{knob.highLabel}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Footer Controls */}
+          <div className="px-3 py-2 rounded-xl bg-[#121A16] border border-[#24332B] flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
+            <button
+              type="button"
+              data-testid="coach-style-reset-btn"
+              disabled={isDefaultStyle}
+              onClick={() => onResetCoachPlaystyle?.()}
+              className={`px-2.5 py-1 rounded-lg font-mono text-xs font-semibold border transition-colors ${
+                isDefaultStyle
+                  ? 'bg-[#151E19] border-[#223028] text-[#5F5B52] cursor-not-allowed'
+                  : 'bg-[#1D2822] hover:bg-[#27362E] border-[#34463C] text-[#EADBC8] cursor-pointer'
+              }`}
+            >
+              Reset Balanced
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('tactics')}
+              className="text-xs font-mono font-semibold text-[#C6923A] hover:underline cursor-pointer"
+            >
+              ← Back to Live Tactics
+            </button>
+          </div>
+        </div>
       ) : activeTab === 'principles' ? (
         /* ====================================================================
-         * TAB 2: LIVE OPENING PRINCIPLES CHECKLIST & MILESTONES
+         * TAB 3: LIVE OPENING PRINCIPLES CHECKLIST & MILESTONES
          * ================================================================== */
         <div className="flex-1 min-h-0 flex flex-col justify-between overflow-y-auto pr-1 space-y-3">
           {openingPrinciplesReport ? (

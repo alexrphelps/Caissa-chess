@@ -29,6 +29,13 @@ import {
   OpeningAnalysisResult,
 } from './chess/openingBook';
 import {
+  createCoachPlaystyleFromPreset,
+  loadCoachPlaystyle,
+  saveCoachPlaystyle,
+  serializeCoachPlaystyleKey,
+  updateCoachPlaystyleKnob,
+} from './chess/coachPlaystyle';
+import {
   analyzeTactics,
   RecommendedMove,
   TacticsAnalysis,
@@ -59,6 +66,9 @@ import {
   AIPresetId,
   AISearchResult,
   ChessEngineConfig,
+  CoachPlaystyleKnobs,
+  CoachPlaystylePresetId,
+  CoachPlaystyleProfile,
   Color,
   EngineProfileState,
   GameMode,
@@ -161,7 +171,7 @@ export default function App() {
         const parsed = JSON.parse(rawProfile) as Partial<EngineProfileState>;
         if (parsed && typeof parsed.elo === 'number' && parsed.config) {
           return {
-            elo: Math.max(400, Math.min(2400, Math.round(parsed.elo))),
+            elo: Math.max(400, Math.min(3000, Math.round(parsed.elo))),
             presetId: parsed.presetId ?? 'custom',
             isCustom: Boolean(parsed.isCustom),
             activeSavedProfileId: parsed.activeSavedProfileId ?? null,
@@ -241,6 +251,42 @@ export default function App() {
     uiPrefsRef.current = defaults;
     setUiPrefs(defaults);
     saveUILayoutPreferences(defaults);
+  }, []);
+
+  // Persisted Tactical Coach Playstyle Profile (independent from Opponent AI difficulty; Coach always runs at 3000+ GM)
+  const [coachPlaystyle, setCoachPlaystyle] = useState<CoachPlaystyleProfile>(
+    () => loadCoachPlaystyle()
+  );
+
+  const coachPlaystyleKey = useMemo(
+    () => serializeCoachPlaystyleKey(coachPlaystyle),
+    [coachPlaystyle]
+  );
+
+  const handleSelectCoachPlaystylePreset = useCallback(
+    (presetId: Exclude<CoachPlaystylePresetId, 'custom'>) => {
+      const next = createCoachPlaystyleFromPreset(presetId);
+      setCoachPlaystyle(next);
+      saveCoachPlaystyle(next);
+    },
+    []
+  );
+
+  const handleChangeCoachPlaystyleKnob = useCallback(
+    (key: keyof CoachPlaystyleKnobs, value: number) => {
+      setCoachPlaystyle((prev) => {
+        const next = updateCoachPlaystyleKnob(prev, key, value);
+        saveCoachPlaystyle(next);
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleResetCoachPlaystyle = useCallback(() => {
+    const balanced = createCoachPlaystyleFromPreset('balanced');
+    setCoachPlaystyle(balanced);
+    saveCoachPlaystyle(balanced);
   }, []);
 
   // Responsive Viewport & Arena Measurement (adapts seamlessly to window resize and browser zoom)
@@ -872,15 +918,16 @@ export default function App() {
     !isAIThinking &&
     (gameMode === 'pass_and_play' || gameState.turn === playerColor);
 
-  // Instant 3-ply + Quiescence tactical analysis so there is never an empty frame
+  // Instant 3000+ fast tactical preview (up to 6-ply + Quiescence) so there is never an empty frame
   const fastHelperAnalysis: TacticsAnalysis | null = useMemo(() => {
     if (!helperMode || !isHumanTurn) return null;
-    return analyzeTactics(gameState);
-  }, [helperMode, isHumanTurn, gameState]);
+    return analyzeTactics(gameState, undefined, coachPlaystyle);
+  }, [helperMode, isHumanTurn, gameState, coachPlaystyle]);
 
-  // Progressive 5–6 ply + Quiescence Deep Coach analysis computed in the background Web Worker
+  // Progressive 3000+ GM Deep Coach Multi-PV analysis (up to 14-16 ply + Quiescence) in the background Web Worker
   const [deepCoachState, setDeepCoachState] = useState<{
     forState: GameState;
+    playstyleKey: string;
     analysis: TacticsAnalysis;
   } | null>(null);
 
@@ -890,29 +937,49 @@ export default function App() {
     }
 
     const abortController = new AbortController();
-    computeDeepCoachAnalysis(gameState, abortController.signal).then(
-      (deepResult) => {
+    // Slight 100ms debounce so dragging playstyle sliders feels 60fps smooth before launching deep worker search
+    const debounceTimer = window.setTimeout(() => {
+      if (abortController.signal.aborted) return;
+      computeDeepCoachAnalysis(
+        gameState,
+        abortController.signal,
+        undefined,
+        coachPlaystyle
+      ).then((deepResult) => {
         if (!abortController.signal.aborted && deepResult) {
           setDeepCoachState({
             forState: gameState,
+            playstyleKey: coachPlaystyleKey,
             analysis: deepResult,
           });
         }
-      }
-    );
+      });
+    }, 100);
 
     return () => {
+      window.clearTimeout(debounceTimer);
       abortController.abort();
     };
-  }, [helperMode, isHumanTurn, gameState]);
+  }, [helperMode, isHumanTurn, gameState, coachPlaystyle, coachPlaystyleKey]);
 
   const helperAnalysis: TacticsAnalysis | null = useMemo(() => {
     if (!helperMode || !isHumanTurn) return null;
-    if (deepCoachState && deepCoachState.forState === gameState) {
+    if (
+      deepCoachState &&
+      deepCoachState.forState === gameState &&
+      deepCoachState.playstyleKey === coachPlaystyleKey
+    ) {
       return deepCoachState.analysis;
     }
     return fastHelperAnalysis;
-  }, [helperMode, isHumanTurn, gameState, deepCoachState, fastHelperAnalysis]);
+  }, [
+    helperMode,
+    isHumanTurn,
+    gameState,
+    deepCoachState,
+    coachPlaystyleKey,
+    fastHelperAnalysis,
+  ]);
 
   const openingAnalysis: OpeningAnalysisResult = useMemo(() => {
     return analyzeOpeningAndStrategy(gameState);
@@ -1914,6 +1981,10 @@ export default function App() {
                 commitMove(rec.move);
               }
             }}
+            coachPlaystyle={coachPlaystyle}
+            onSelectCoachPlaystylePreset={handleSelectCoachPlaystylePreset}
+            onChangeCoachPlaystyleKnob={handleChangeCoachPlaystyleKnob}
+            onResetCoachPlaystyle={handleResetCoachPlaystyle}
           />
         )}
       </main>

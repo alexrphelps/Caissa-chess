@@ -116,7 +116,7 @@ test('exportSessionToPgn generates standard PGN headers and moves', () => {
   const pgn = exportSessionToPgn(session);
   assert.ok(pgn.includes('[Event "King Pawn Game"]'));
   assert.ok(pgn.includes('[White "Human"]'));
-  assert.ok(pgn.includes('[Black "Caïssa AI (2200 Elo)"]'));
+  assert.ok(pgn.includes('[Black "Caïssa AI (3000 Elo)"]'));
   assert.ok(pgn.includes('1. e4 e5 2. Nf3'));
 });
 

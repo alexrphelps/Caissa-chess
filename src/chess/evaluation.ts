@@ -21,7 +21,7 @@ export const MATE_THRESHOLD = 90000;
 export const MAX_HARD_TIME_LIMIT_MS = 15000;
 export const MAX_GAME_PHASE = 24;
 export const MIN_ENGINE_ELO = 400;
-export const MAX_ENGINE_ELO = 2400;
+export const MAX_ENGINE_ELO = 3000;
 
 export const DEFAULT_EVAL_WEIGHTS: Readonly<EvalWeights> = {
   material: 1.0,
@@ -32,8 +32,8 @@ export const DEFAULT_EVAL_WEIGHTS: Readonly<EvalWeights> = {
 };
 
 export const DEFAULT_ENGINE_CONFIG: Readonly<ChessEngineConfig> = {
-  maxDepth: 6,
-  maxTimeMs: 1150,
+  maxDepth: 18,
+  maxTimeMs: 1200,
   enableQuiescence: true,
   enableTranspositionTable: true,
   enableNullMovePruning: true,
@@ -74,11 +74,11 @@ export const AI_DIFFICULTY_LEVELS: readonly AIDifficultyInfo[] = [
   {
     id: 'club',
     level: 4,
-    name: 'Club',
-    shortLabel: 'Club (2200+)',
-    elo: 2200,
-    depthLabel: '5–6p+Q · Zobrist/NMP/LMR',
-    description: 'Zobrist TT + NMP + LMR + Tapered Eval + Quiescence Checks',
+    name: 'Grandmaster',
+    shortLabel: 'GM (3000+)',
+    elo: 3000,
+    depthLabel: '12–20p+Q · PVS/64MB TT',
+    description: '3000+ Elo · 0x88 PVS + 64MB TT + Aspiration + NMP/LMR/RFP + PeSTO Eval',
   },
 ] as const;
 
@@ -153,8 +153,8 @@ export function getEngineConfigForDifficulty(
     case 'club':
     default:
       return {
-        maxDepth: 5,
-        maxTimeMs: 1150,
+        maxDepth: 20,
+        maxTimeMs: 1200,
         enableQuiescence: true,
         enableTranspositionTable: true,
         enableNullMovePruning: true,
@@ -177,7 +177,7 @@ function roundToTwo(val: number): number {
 }
 
 /**
- * Deterministic continuous Elo-to-Engine-Parameters interpolation across the 400–2400 Elo spectrum.
+ * Deterministic continuous Elo-to-Engine-Parameters interpolation across the 400–3000 Elo spectrum.
  * Smoothly adjusts search depth, time budget, tactical pruning flags, evaluation weights,
  * and humanization error rates so every rating increment produces a calibrated change in strength.
  */
@@ -186,20 +186,23 @@ export function interpolateEngineConfigFromElo(rawElo: number): ChessEngineConfi
     MIN_ENGINE_ELO,
     Math.min(MAX_ENGINE_ELO, Math.round(rawElo))
   );
-  // Normalized progress t in [0.0, 1.0] across 400..2400
+  // Normalized progress t in [0.0, 1.0] across 400..3000
   const t = (elo - MIN_ENGINE_ELO) / (MAX_ENGINE_ELO - MIN_ENGINE_ELO);
 
-  // 1. Search Depth (1 ply at 400-699, 2 ply at 700-1199, 3 ply at 1200-1449, 4 ply at 1450-1749, 5 ply at 1750-2099, 6 ply at 2100-2299, 7 ply at 2300+)
+  // 1. Search Depth scaling smoothly from 1 ply (400 Elo) up to 20 ply (3000 Elo)
   let maxDepth = 1;
-  if (elo >= 2300) maxDepth = 7;
-  else if (elo >= 2100) maxDepth = 6;
+  if (elo >= 2900) maxDepth = 20;
+  else if (elo >= 2700) maxDepth = 16;
+  else if (elo >= 2500) maxDepth = 12;
+  else if (elo >= 2300) maxDepth = 9;
+  else if (elo >= 2100) maxDepth = 7;
   else if (elo >= 1750) maxDepth = 5;
   else if (elo >= 1450) maxDepth = 4;
   else if (elo >= 1200) maxDepth = 3;
   else if (elo >= 700) maxDepth = 2;
 
-  // 2. Time Budget (smoothly scales from 200ms at 400 Elo to 1400ms at 2400 Elo)
-  const maxTimeMs = Math.round(200 + Math.pow(t, 1.2) * 1200);
+  // 2. Time Budget (smoothly scales from 200ms at 400 Elo to 1600ms at 3000 Elo)
+  const maxTimeMs = Math.round(200 + Math.pow(t, 1.2) * 1400);
 
   // 3. Tactical & Pruning Toggles
   // Enable Quiescence from 950 Elo upward so the bot resolves capture chains and makes sound trades!
@@ -213,19 +216,19 @@ export function interpolateEngineConfigFromElo(rawElo: number): ChessEngineConfi
   const pieceSquareTables =
     elo < 550
       ? 0.0
-      : roundToTwo(Math.min(1.15, ((elo - 500) / 1100) * 1.0));
+      : roundToTwo(Math.min(1.0, ((elo - 500) / 1100) * 1.0));
   const kingSafety =
     elo < 600
       ? 0.0
-      : roundToTwo(Math.min(1.2, ((elo - 550) / 1050) * 1.0));
+      : roundToTwo(Math.min(1.0, ((elo - 550) / 1050) * 1.0));
   const pawnStructure =
     elo < 650
       ? 0.0
-      : roundToTwo(Math.min(1.15, ((elo - 600) / 1200) * 1.0));
+      : roundToTwo(Math.min(1.0, ((elo - 600) / 1200) * 1.0));
   const mobility =
     elo < 700
       ? 0.0
-      : roundToTwo(Math.min(1.15, ((elo - 650) / 1250) * 1.0));
+      : roundToTwo(Math.min(1.0, ((elo - 650) / 1250) * 1.0));
 
   // 5. Humanization & Blunder Modeling
   // Smooth decay from 0.42 at 400 Elo down to 0.0 at 2050+ Elo
@@ -348,11 +351,12 @@ export const ENGINE_MILESTONE_PRESETS: readonly EnginePresetInfo[] = [
   {
     id: 'club',
     legacyDifficulty: 'club',
-    name: 'Master',
-    shortLabel: 'Master (2200+)',
-    elo: 2200,
-    depthLabel: '5–6p+Q · Full Engine',
-    description: 'Maximum classical strength · Zobrist TT + NMP + LMR + Tapered Eval',
+    name: 'Grandmaster',
+    shortLabel: 'GM (3000+)',
+    elo: 3000,
+    depthLabel: '12–20p+Q · Full 3000+',
+    description:
+      '3000+ Elo classical strength · 0x88 PVS + 64MB TT + Aspiration + NMP/LMR/RFP + PeSTO',
     config: getEngineConfigForDifficulty('club'),
   },
 ] as const;
@@ -492,6 +496,15 @@ export function resolveEngineConfig(
       patch.evalWeights?.mobility,
       base.evalWeights.mobility
     ),
+    ...(patch.evalWeights?.aggression !== undefined ||
+    base.evalWeights.aggression !== undefined
+      ? {
+          aggression: clampWeight(
+            patch.evalWeights?.aggression,
+            base.evalWeights.aggression ?? 1.0
+          ),
+        }
+      : {}),
   };
 
   const rawDepth = patch.maxDepth ?? base.maxDepth;

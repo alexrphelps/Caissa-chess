@@ -72,6 +72,36 @@ export interface EvalWeights {
   pawnStructure: number;        // Weight multiplier (0.0 - 2.0)
   kingSafety: number;           // Weight multiplier (0.0 - 2.0)
   mobility: number;             // Weight multiplier (0.0 - 2.0)
+  aggression?: number;          // Optional offensive attack & king-zone pressure multiplier (0.0 - 2.0, default 1.0)
+}
+
+export type CoachPlaystylePresetId =
+  | 'balanced'
+  | 'aggressive'
+  | 'active'
+  | 'solid'
+  | 'positional'
+  | 'custom';
+
+export interface CoachPlaystyleKnobs {
+  aggression: number;     // 0.4 - 1.8: King-zone attack, forward pressure, sharp initiative
+  mobility: number;       // 0.4 - 1.8: Safe piece activity, open files, dynamic squares
+  kingSafety: number;     // 0.4 - 1.8: Pawn shield, castling shelter, defensive solidity
+  pawnStructure: number;  // 0.4 - 1.8: Passed & connected pawns, structural soundness
+  piecePlacement: number; // 0.4 - 1.8: Center control & PeSTO piece-square harmony
+}
+
+export interface CoachPlaystyleProfile {
+  presetId: CoachPlaystylePresetId;
+  knobs: CoachPlaystyleKnobs;
+}
+
+export interface CoachPlaystylePresetInfo {
+  id: Exclude<CoachPlaystylePresetId, 'custom'>;
+  name: string;
+  shortLabel: string;
+  summary: string;
+  knobs: CoachPlaystyleKnobs;
 }
 
 export interface ChessEngineConfig {

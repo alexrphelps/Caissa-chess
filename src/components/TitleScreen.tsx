@@ -123,7 +123,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
             </button>
           )}
           <span className="text-xs font-mono text-[#A69F91] tabular-nums hidden md:inline">
-            STD · 400–2400 ELO ENGINE
+            STD · 400–3000 ELO ENGINE
           </span>
         </div>
       </div>
@@ -270,7 +270,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                   </button>
                 </div>
 
-                {/* Continuous 400 - 2400 Elo Slider */}
+                {/* Continuous 400 - 3000 Elo Slider */}
                 <div className="space-y-1">
                   <input
                     type="range"
@@ -287,9 +287,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                     <span>400 Elo</span>
                     <span>1000</span>
                     <span className="text-[#4ADE80]">1150 Reactive</span>
-                    <span>1500</span>
-                    <span>2000</span>
-                    <span>2400+</span>
+                    <span>1800</span>
+                    <span>2400</span>
+                    <span>3000+ GM</span>
                   </div>
                 </div>
 

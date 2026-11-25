@@ -62,6 +62,102 @@ import {
   Square,
   TTFlag,
 } from './types';
+import { FastBoard } from './engineCore/board';
+import { FastSearchEngine } from './engineCore/search';
+import { getSharedTT, TranspositionTable } from './engineCore/tt';
+import { FastMove, fastMoveToUci, SearchInfoEvent } from './engineCore/types';
+
+let sharedFastBoard: FastBoard | null = null;
+let sharedFastEngine: FastSearchEngine | null = null;
+let coachFastBoard: FastBoard | null = null;
+let coachFastEngine: FastSearchEngine | null = null;
+let lastCoachWeightsSignature = '';
+
+function computeEvalWeightsSignature(weights: EvalWeights): string {
+  return `${weights.material.toFixed(2)}|${weights.pieceSquareTables.toFixed(
+    2
+  )}|${weights.pawnStructure.toFixed(2)}|${weights.kingSafety.toFixed(
+    2
+  )}|${weights.mobility.toFixed(2)}|${(weights.aggression ?? 1.0).toFixed(2)}`;
+}
+
+export function getSharedFastBoard(): FastBoard {
+  if (!sharedFastBoard) {
+    sharedFastBoard = new FastBoard();
+  }
+  return sharedFastBoard;
+}
+
+export function getSharedFastEngine(): FastSearchEngine {
+  if (!sharedFastEngine) {
+    sharedFastEngine = new FastSearchEngine(getSharedTT(64));
+  }
+  return sharedFastEngine;
+}
+
+/**
+ * Dedicated Tactical Coach 3000+ engine instance with its own 16 MB Flat TypedArray TT.
+ * Completely isolated from the Opponent AI's 64 MB TT, and automatically flushes stale TT scores
+ * whenever the user changes their Tactical Coach playstyle tuning knobs.
+ */
+export function getCoachFastEngine(weights: EvalWeights): FastSearchEngine {
+  if (!coachFastEngine) {
+    coachFastEngine = new FastSearchEngine(new TranspositionTable(16));
+  }
+  const sig = computeEvalWeightsSignature(weights);
+  if (lastCoachWeightsSignature !== '' && lastCoachWeightsSignature !== sig) {
+    coachFastEngine.clearState();
+  }
+  lastCoachWeightsSignature = sig;
+  return coachFastEngine;
+}
+
+function getCoachFastBoard(): FastBoard {
+  if (!coachFastBoard) {
+    coachFastBoard = new FastBoard();
+  }
+  return coachFastBoard;
+}
+
+function matchFastMoveToLegal(
+  fastMove: FastMove,
+  legalMoves: Move[]
+): Move | undefined {
+  if (fastMove === 0) return undefined;
+  const uci = fastMoveToUci(fastMove);
+  return legalMoves.find(
+    (m) => `${m.from}${m.to}${m.promotion ?? ''}` === uci
+  );
+}
+
+function fastMoveListToPVSteps(
+  rootState: GameState,
+  fastMoves: FastMove[],
+  maxSteps = 6
+): PVStep[] {
+  const steps: PVStep[] = [];
+  let curr = rootState;
+  const limit = Math.min(maxSteps, fastMoves.length);
+  for (let i = 0; i < limit; i++) {
+    if (curr.status !== 'playing') break;
+    const legal = generateLegalMoves(curr);
+    const appMove = matchFastMoveToLegal(fastMoves[i], legal);
+    if (!appMove) break;
+    const next = makeMove(curr, appMove);
+    const san =
+      next.moveHistory[next.moveHistory.length - 1]?.san ??
+      `${appMove.from}-${appMove.to}`;
+    steps.push({
+      from: appMove.from,
+      to: appMove.to,
+      san,
+      color: curr.turn,
+      move: appMove,
+    });
+    curr = next;
+  }
+  return steps;
+}
 
 export {
   AI_DIFFICULTY_LEVELS,
@@ -1695,195 +1791,42 @@ export function searchBestAIMove(
   }
 
   // ============================================================================
-  // UNIFIED PARAMETERIZED ITERATIVE DEEPENING ENGINE (Intermediate, Club 2200+, Custom Config)
-  // - Iterative Deepening from depth 1 -> targetDepth
-  // - Hard Time Cutoff checked every 2048 nodes (discards incomplete iteration on timeout)
-  // - 64-bit Zobrist Transposition Table + Mate Distance Normalization
-  // - Null-Move Pruning (NMP) + Late Move Reductions (LMR) + Quiescence
-  // - Configurable evalWeights and errorProbability / errorMarginCentipawns
+  // UNIFIED 3000+ ELO FAST 0x88 PVS SEARCH ENGINE
+  // (Reactive, Intermediate, Club 1800, Grandmaster 3000+, Custom Config)
+  // - Zero-allocation 0x88 board + piece lists + incremental PeSTO MG/EG eval
+  // - Persistent 64 MB Flat TypedArray Transposition Table (64-bit Zobrist)
+  // - Iterative Deepening with Soft (~45%) & Hard (2048-node check) Time Bounds
+  // - Aspiration Windows + PVS + NMP + LMR + RFP + Futility/LMP + Check Ext + SEE Q-Search
   // ============================================================================
-  const currentRisk = getTotalHangingRisk(state.board, aiColor);
-  const isEndgame = isEndgamePhase(state.board);
-  const totalPieces = countTotalPieces(state.board);
+  const fastBoard = getSharedFastBoard();
+  const fastEngine = getSharedFastEngine();
+  fastBoard.loadGameState(state);
 
-  let targetDepth = config.maxDepth;
-  if (difficulty === 'club' && !hasCustomConfig) {
-    targetDepth = totalPieces <= 10 ? 6 : 5;
-  }
+  const targetDepth = config.maxDepth;
+  const hardTimeMs = Math.max(25, Math.min(MAX_HARD_TIME_LIMIT_MS, config.maxTimeMs));
+  const softTimeMs = Math.max(20, Math.floor(hardTimeMs * 0.45));
 
-  const rootZobrist = computeZobristHash(state);
-  const ctx: SearchContext = {
-    difficulty,
+  const outcome = fastEngine.search(fastBoard, {
+    maxDepth: targetDepth,
+    maxTimeMs: hardTimeMs,
+    softTimeMs,
     config,
-    evalParam: hasCustomConfig ? config : difficulty,
-    nodes: 0,
-    ttHits: 0,
-    isEndgame,
-    tt: new Map(),
-    killerMoves: Array.from({ length: MAX_PLY }, () => [undefined, undefined]),
-    historyTable: createHistoryTable(),
-    pathHashes: [rootZobrist],
-    startTimeMs,
-    maxTimeMs: config.maxTimeMs,
-    aborted: false,
-  };
+    rng,
+  });
 
-  // Precompute root safety and child states once
-  const rootSafety = new Map<Move, ReturnType<typeof isCandidateSafeFromBlunder>>();
-  const rootNextStates = new Map<Move, GameState>();
-  for (const move of candidateMoves) {
-    rootSafety.set(move, isCandidateSafeFromBlunder(state, move, currentRisk));
-    const nextSt = makeMove(state, move);
-    nextSt.zobristHash = updateZobristHashAfterMove(
-      rootZobrist,
-      state,
-      move,
-      nextSt.castlingRights,
-      nextSt.enPassantTarget
-    );
-    rootNextStates.set(move, nextSt);
-  }
-
-  const orderedRoot = orderMoves(
-    candidateMoves,
-    isEndgame,
-    undefined,
-    undefined,
-    undefined,
-    state.board,
-    ctx.historyTable
-  );
-  const rootScores = new Map<Move, number>();
-  let completedDepth = 0;
-
-  for (let d = 1; d <= targetDepth; d++) {
-    if (d >= 2 && performance.now() - startTimeMs >= ctx.maxTimeMs) {
-      ctx.aborted = true;
-      break;
-    }
-
-    let searchAlpha = -MATE_SCORE;
-    const beta = MATE_SCORE;
-    const iterScores = new Map<Move, number>();
-
-    for (const move of orderedRoot) {
-      const nextState = rootNextStates.get(move)!;
-      if (nextState.status === 'checkmate') {
-        iterScores.set(move, MATE_SCORE - 1);
-        searchAlpha = MATE_SCORE - 1;
-        continue;
-      }
-      if (
-        nextState.status === 'stalemate' ||
-        nextState.status === 'draw_repetition' ||
-        nextState.status === 'draw_fifty_move' ||
-        nextState.status === 'draw_insufficient'
-      ) {
-        iterScores.set(move, 0);
-        if (0 > searchAlpha) {
-          searchAlpha = 0;
-        }
-        continue;
-      }
-
-      const safety = rootSafety.get(move)!;
-      const searchScore = -alphaBeta(
-        nextState,
-        d - 1,
-        1,
-        -beta,
-        -searchAlpha,
-        ctx,
-        false
-      );
-
-      // Hard cutoff: if move time limit was hit during this iteration (and we have completed at least depth 1),
-      // immediately discard this incomplete iteration and return the best move from the last completed ply.
-      if (ctx.aborted && completedDepth >= 1) {
-        break;
-      }
-
-      // Keep searchAlpha strictly in the raw searchScore domain so safety tie-breakers
-      // never distort the [-beta, -searchAlpha] window for subsequent root moves!
-      if (!safety.leavesQueenHanging && searchScore > searchAlpha) {
-        searchAlpha = searchScore;
-      }
-
-      const reactiveRescueBonus =
-        config.maxDepth <= 3 && safety.isSafe && safety.netMaterialSafetyDelta > 0
-          ? Math.min(45, Math.round(safety.netMaterialSafetyDelta * 0.12))
-          : 0;
-
-      const effectiveScore = safety.leavesQueenHanging
-        ? Math.min(searchScore, searchScore - 900)
-        : !safety.isSafe && (difficulty === 'intermediate' || config.maxDepth <= 4)
-        ? searchScore - 280
-        : searchScore + reactiveRescueBonus;
-
-      iterScores.set(move, effectiveScore);
-    }
-
-    // Commit iteration only if it completed fully (or if d === 1 so we always have at least 1 completed ply)
-    if (!ctx.aborted || completedDepth === 0) {
-      completedDepth = d;
-      for (const [m, sc] of iterScores.entries()) {
-        rootScores.set(m, sc);
-      }
-      orderedRoot.sort(
-        (a, b) =>
-          (rootScores.get(b) ?? -Infinity) - (rootScores.get(a) ?? -Infinity)
-      );
-
-      const topScore = rootScores.get(orderedRoot[0]) ?? -Infinity;
-      if (topScore >= MATE_SCORE - 2) {
-        break;
-      }
-    }
-
-    if (ctx.aborted) {
-      break;
-    }
-  }
-
-  let chosenMove = orderedRoot[0];
-  let chosenScore = rootScores.get(chosenMove) ?? 0;
-
-  // Apply configurable Handicap & Humanization (`errorProbability` and `errorMarginCentipawns`)
-  if (
-    config.errorProbability > 0 &&
-    config.errorMarginCentipawns > 0 &&
-    orderedRoot.length >= 2 &&
-    chosenScore < MATE_THRESHOLD &&
-    rng() < config.errorProbability
-  ) {
-    const margin = config.errorMarginCentipawns;
-    const handicapCandidates = orderedRoot.filter((m) => {
-      const sc = rootScores.get(m) ?? -Infinity;
-      const sf = rootSafety.get(m);
-      return (
-        !sf?.leavesQueenHanging &&
-        Boolean(sf?.isSafe) &&
-        chosenScore - sc <= margin
-      );
-    });
-    if (handicapCandidates.length > 1) {
-      chosenMove =
-        handicapCandidates[Math.floor(rng() * handicapCandidates.length)];
-      chosenScore = rootScores.get(chosenMove) ?? chosenScore;
-    }
-  }
-
-  const whiteScore = chosenScore * signForWhite;
+  const chosenMove =
+    matchFastMoveToLegal(outcome.bestMove, legalMoves) ?? legalMoves[0];
+  const whiteScore = outcome.score * signForWhite;
 
   return {
     move: chosenMove,
     difficulty,
-    depth: Math.max(1, completedDepth),
-    nodes: ctx.nodes,
+    depth: Math.max(1, outcome.depth),
+    nodes: outcome.nodes,
     score: whiteScore,
     formattedScore: formatEvalScore(whiteScore),
-    elapsedMs: Math.max(1, Math.round(performance.now() - startTimeMs)),
-    ttHits: ctx.ttHits,
+    elapsedMs: Math.max(1, outcome.elapsedMs),
+    ttHits: outcome.ttHits,
     config,
   };
 }
@@ -2062,8 +2005,8 @@ function extractPrincipalVariation(
 }
 
 /**
- * Runs a Multi-PV Iterative Deepening Alpha-Beta + Quiescence search backed by
- * 64-bit Zobrist TT, NMP, LMR, and 6-tier move ordering.
+ * Runs a Multi-PV Iterative Deepening PVS + Quiescence search backed by the
+ * zero-allocation 0x88 engine, persistent 64 MB flat TypedArray TT, NMP, LMR, and PeSTO eval.
  */
 export function searchMultiPV(
   state: GameState,
@@ -2072,17 +2015,18 @@ export function searchMultiPV(
     maxTimeMs?: number;
     multiPvCount?: number;
     engineConfig?: Partial<ChessEngineConfig>;
+    forCoach?: boolean;
+    onInfo?: (info: SearchInfoEvent) => void;
   }
 ): MultiPVSearchResult {
   const startTimeMs = performance.now();
-  const isEndgame = isEndgamePhase(state.board);
   const totalPieces = countTotalPieces(state.board);
-  const defaultDepth = totalPieces <= 12 ? 6 : 5;
+  const defaultDepth = totalPieces <= 12 ? 16 : 14;
   const targetDepth =
     options?.maxDepth ?? options?.engineConfig?.maxDepth ?? defaultDepth;
   const maxTimeMs = Math.min(
     MAX_HARD_TIME_LIMIT_MS,
-    options?.maxTimeMs ?? options?.engineConfig?.maxTimeMs ?? 1150
+    options?.maxTimeMs ?? options?.engineConfig?.maxTimeMs ?? 1050
   );
   const multiPvCount = options?.multiPvCount ?? 3;
 
@@ -2090,6 +2034,17 @@ export function searchMultiPV(
     ...options?.engineConfig,
     maxDepth: targetDepth,
     maxTimeMs,
+    // Tactical Coach Multi-PV always runs with full 3000+ search features and zero error
+    ...(options?.forCoach
+      ? {
+          enableQuiescence: true,
+          enableTranspositionTable: true,
+          enableNullMovePruning: true,
+          enableLMR: true,
+          errorProbability: 0.0,
+          errorMarginCentipawns: 0,
+        }
+      : {}),
   });
 
   const legalMoves = generateLegalMoves(state);
@@ -2106,262 +2061,91 @@ export function searchMultiPV(
 
   const aiColor = state.turn;
   const signForWhite = aiColor === 'w' ? 1 : -1;
-
-  const candidateMoves = legalMoves.filter(
-    (m) =>
-      !(
-        (m.promotion === 'r' || m.promotion === 'b') &&
-        legalMoves.some(
-          (o) => o.from === m.from && o.to === m.to && o.promotion === 'q'
-        )
-      )
-  );
-
   const currentRisk = getTotalHangingRisk(state.board, aiColor);
-  const rootZobrist = computeZobristHash(state);
 
-  const rootMeta = new Map<
-    Move,
-    {
-      nextState: GameState;
-      san: string;
-      seeScore: number;
-      safety: ReturnType<typeof isCandidateSafeFromBlunder>;
-    }
-  >();
+  const useCoachEngine =
+    options?.forCoach === true ||
+    options?.engineConfig?.evalWeights !== undefined;
+  const fastBoard = useCoachEngine ? getCoachFastBoard() : getSharedFastBoard();
+  const fastEngine = useCoachEngine
+    ? getCoachFastEngine(clubConfig.evalWeights)
+    : getSharedFastEngine();
+  fastBoard.loadGameState(state);
 
-  for (const move of candidateMoves) {
+  const outcome = fastEngine.search(fastBoard, {
+    maxDepth: targetDepth,
+    maxTimeMs,
+    softTimeMs: Math.max(40, Math.floor(maxTimeMs * 0.6)),
+    multiPv: Math.max(multiPvCount, 1),
+    config: clubConfig,
+    onInfo: options?.onInfo,
+  });
+
+  const lines = outcome.multiPvLines ?? [];
+  const items: MultiPVItem[] = [];
+  const seenKeys = new Set<string>();
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
+    const move = matchFastMoveToLegal(line.move, legalMoves);
+    if (!move) continue;
+    const key = `${move.from}${move.to}${move.promotion ?? ''}`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+
     const nextState = makeMove(state, move);
-    nextState.zobristHash = updateZobristHashAfterMove(
-      rootZobrist,
-      state,
-      move,
-      nextState.castlingRights,
-      nextState.enPassantTarget
-    );
     const san =
       nextState.moveHistory[nextState.moveHistory.length - 1]?.san ??
       `${move.from}-${move.to}`;
     const seeScore = evaluateSEE(state.board, move, aiColor);
     const safety = isCandidateSafeFromBlunder(state, move, currentRisk);
-    rootMeta.set(move, { nextState, san, seeScore, safety });
-  }
-
-  const hasCustomWeights = Boolean(options?.engineConfig?.evalWeights);
-
-  const ctx: SearchContext = {
-    difficulty: 'club',
-    config: clubConfig,
-    evalParam: hasCustomWeights ? clubConfig : 'club',
-    nodes: 0,
-    ttHits: 0,
-    isEndgame,
-    tt: new Map(),
-    killerMoves: Array.from({ length: MAX_PLY }, () => [undefined, undefined]),
-    historyTable: createHistoryTable(),
-    pathHashes: [rootZobrist],
-    startTimeMs,
-    maxTimeMs,
-    aborted: false,
-  };
-
-  const orderedRoot = orderMoves(
-    candidateMoves,
-    isEndgame,
-    undefined,
-    undefined,
-    undefined,
-    state.board,
-    ctx.historyTable
-  );
-  const rootScores = new Map<Move, number>();
-  const rootPvSnapshots = new Map<Move, PVStep[]>();
-  let completedDepth = 1;
-
-  for (let d = 1; d <= targetDepth; d++) {
-    const iterScores = new Map<Move, number>();
-    const iterPvSnapshots = new Map<Move, PVStep[]>();
-    const topScoresSoFar: number[] = [];
-
-    for (let i = 0; i < orderedRoot.length; i++) {
-      const move = orderedRoot[i];
-      const meta = rootMeta.get(move)!;
-      const { nextState, safety } = meta;
-
-      if (nextState.status === 'checkmate') {
-        const mateVal = MATE_SCORE - 1;
-        iterScores.set(move, mateVal);
-        iterPvSnapshots.set(move, [
-          {
-            from: move.from,
-            to: move.to,
-            san: meta.san,
-            color: state.turn,
-            move,
-          },
-        ]);
-        topScoresSoFar.push(mateVal);
-        topScoresSoFar.sort((a, b) => b - a);
-        continue;
-      }
-
-      if (
-        nextState.status === 'stalemate' ||
-        nextState.status === 'draw_repetition' ||
-        nextState.status === 'draw_fifty_move' ||
-        nextState.status === 'draw_insufficient'
-      ) {
-        iterScores.set(move, 0);
-        iterPvSnapshots.set(move, [
-          {
-            from: move.from,
-            to: move.to,
-            san: meta.san,
-            color: state.turn,
-            move,
-          },
-        ]);
-        topScoresSoFar.push(0);
-        topScoresSoFar.sort((a, b) => b - a);
-        continue;
-      }
-
-      let searchAlpha = -MATE_SCORE;
-      if (d >= 2 && topScoresSoFar.length > 0) {
-        const bestSoFar = topScoresSoFar[0];
-        if (i < multiPvCount) {
-          if (d >= 3) {
-            searchAlpha = Math.max(-MATE_SCORE, bestSoFar - 90);
-          }
-        } else {
-          const kthScore =
-            topScoresSoFar[
-              Math.min(multiPvCount - 1, topScoresSoFar.length - 1)
-            ];
-          searchAlpha = Math.max(
-            -MATE_SCORE,
-            Math.max(bestSoFar - 25, kthScore - 6)
-          );
-        }
-      }
-
-      let searchScore = -alphaBeta(
-        nextState,
-        d - 1,
-        1,
-        -MATE_SCORE,
-        -searchAlpha,
-        ctx,
-        false
-      );
-
-      // Re-search with full window if a later move beat the aspiration cutoff
-      if (
-        !ctx.aborted &&
-        searchAlpha > -MATE_SCORE &&
-        searchScore > searchAlpha &&
-        i >= multiPvCount
-      ) {
-        searchScore = -alphaBeta(
-          nextState,
-          d - 1,
-          1,
-          -MATE_SCORE,
-          MATE_SCORE,
-          ctx,
-          false
-        );
-      }
-
-      if (ctx.aborted && completedDepth >= 1) break;
-
-      const effectiveScore = safety.leavesQueenHanging
-        ? Math.min(searchScore, searchScore - 900)
-        : searchScore;
-
-      iterScores.set(move, effectiveScore);
-      topScoresSoFar.push(effectiveScore);
-      topScoresSoFar.sort((a, b) => b - a);
-
-      // Zero-cost TT snapshot while this root move's subtree is fresh in the Zobrist TT
-      if (d >= 2 && i < multiPvCount + 2) {
-        const snap = extractPrincipalVariation(
-          state,
-          move,
-          meta.nextState,
-          meta.san,
-          ctx,
-          5,
-          false
-        );
-        if (snap.length >= 2) {
-          iterPvSnapshots.set(move, snap);
-        }
-      }
-    }
-
-    if (!ctx.aborted || d === 1) {
-      completedDepth = d;
-      for (const [m, sc] of iterScores.entries()) {
-        rootScores.set(m, sc);
-      }
-      for (const [m, pv] of iterPvSnapshots.entries()) {
-        rootPvSnapshots.set(m, pv);
-      }
-      orderedRoot.sort(
-        (a, b) =>
-          (rootScores.get(b) ?? -Infinity) - (rootScores.get(a) ?? -Infinity)
-      );
-
-      const topScore = rootScores.get(orderedRoot[0]) ?? -Infinity;
-      if (topScore >= MATE_SCORE - 2) {
-        completedDepth = targetDepth;
-        break;
-      }
-    } else {
-      break;
-    }
-  }
-
-  const items: MultiPVItem[] = orderedRoot.map((move, idx) => {
-    const meta = rootMeta.get(move)!;
-    const scoreForTurn = rootScores.get(move) ?? 0;
+    const scoreForTurn = line.score;
     const whiteScore = scoreForTurn * signForWhite;
     const formattedScore = formatEvalScore(whiteScore);
     const winProb = computeWinProbability(scoreForTurn);
-    const cachedPv = rootPvSnapshots.get(move);
     const pvLine =
-      cachedPv && cachedPv.length >= 3
-        ? cachedPv
-        : extractPrincipalVariation(
-            state,
-            move,
-            meta.nextState,
-            meta.san,
-            ctx,
-            5,
-            idx < multiPvCount
-          );
+      idx < Math.max(multiPvCount + 1, 4)
+        ? fastMoveListToPVSteps(state, line.pv, 6)
+        : [
+            {
+              from: move.from,
+              to: move.to,
+              san,
+              color: state.turn,
+              move,
+            },
+          ];
 
-    return {
+    items.push({
       move,
-      nextState: meta.nextState,
-      san: meta.san,
+      nextState,
+      san,
       scoreForTurn,
       whiteScore,
       formattedScore,
       winProb,
-      seeScore: meta.seeScore,
-      safety: meta.safety,
-      pvLine,
-    };
-  });
+      seeScore,
+      safety,
+      pvLine:
+        pvLine.length > 0
+          ? pvLine
+          : [
+              {
+                from: move.from,
+                to: move.to,
+                san,
+                color: state.turn,
+                move,
+              },
+            ],
+    });
+  }
 
   return {
     items,
-    depth: completedDepth,
-    nodes: ctx.nodes,
-    ttHits: ctx.ttHits,
+    depth: Math.max(1, outcome.depth),
+    nodes: outcome.nodes,
+    ttHits: outcome.ttHits,
     elapsedMs: Math.max(1, Math.round(performance.now() - startTimeMs)),
     config: clubConfig,
   };

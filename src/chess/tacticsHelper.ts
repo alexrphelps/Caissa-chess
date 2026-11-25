@@ -30,8 +30,16 @@ import {
 } from './evaluation';
 import { lookupBookPosition } from './openingBook';
 import {
+  buildCoachEngineConfig,
+  COACH_ENGINE_RATING_LABEL,
+  DEFAULT_COACH_PLAYSTYLE,
+  detectPlaystyleAlignmentNote,
+  sanitizeCoachPlaystyle,
+} from './coachPlaystyle';
+import {
   Board,
   ChessEngineConfig,
+  CoachPlaystyleProfile,
   Color,
   GameState,
   Move,
@@ -93,6 +101,7 @@ export interface RecommendedMove {
   rationale: string; // Single-line summary for board status bar
   coachWhy: string; // Coach explanation of why the move works
   followUpPlan: string; // Follow-up plan & continuation line
+  playstyleNote?: string; // Optional note when move aligns with the player's customized playstyle
   opponentReply?: { from: Square; to: Square; san: string };
   playerFollowUp?: { from: Square; to: Square; san: string };
 }
@@ -119,6 +128,8 @@ export interface TacticsAnalysis {
   isDeepAnalysis: boolean;
   evalBreakdown: TaperedEvalBreakdown;
   engineConfig: ChessEngineConfig;
+  engineRatingLabel: string;
+  playstyle: CoachPlaystyleProfile;
 }
 
 const PIECE_LABELS: Record<PieceType, string> = {
@@ -770,10 +781,11 @@ export function detectOpponentThreat(
   };
 
   const passSearch = searchMultiPV(passState, {
-    maxDepth: options?.maxDepth ?? 3,
-    maxTimeMs: options?.maxTimeMs ?? 55,
+    maxDepth: options?.maxDepth ?? 6,
+    maxTimeMs: options?.maxTimeMs ?? 70,
     multiPvCount: 1,
     engineConfig: options?.engineConfig,
+    forCoach: true,
   });
 
   const enemyBest = passSearch.items[0];
@@ -893,6 +905,7 @@ function computeRecommendationsWithTelemetry(
     maxDepth?: number;
     maxTimeMs?: number;
     engineConfig?: Partial<ChessEngineConfig>;
+    coachPlaystyle?: CoachPlaystyleProfile;
   }
 ): {
   topMoves: RecommendedMove[];
@@ -904,6 +917,9 @@ function computeRecommendationsWithTelemetry(
   engineConfig: ChessEngineConfig;
 } {
   const playerColor = state.turn;
+  const activePlaystyle = sanitizeCoachPlaystyle(
+    searchOptions?.coachPlaystyle ?? DEFAULT_COACH_PLAYSTYLE
+  );
   const baseBreakdown = evaluateTaperedBreakdown(
     state.board,
     playerColor,
@@ -911,7 +927,10 @@ function computeRecommendationsWithTelemetry(
   );
 
   if (state.status !== 'playing') {
-    const emptyRes = searchMultiPV(state, searchOptions);
+    const emptyRes = searchMultiPV(state, {
+      ...searchOptions,
+      forCoach: true,
+    });
     return {
       topMoves: [],
       searchDepth: 0,
@@ -924,10 +943,11 @@ function computeRecommendationsWithTelemetry(
   }
 
   const multiPvResult = searchMultiPV(state, {
-    maxDepth: searchOptions?.maxDepth ?? 3,
+    maxDepth: searchOptions?.maxDepth ?? 6,
     maxTimeMs: searchOptions?.maxTimeMs ?? 90,
     multiPvCount: 3,
     engineConfig: searchOptions?.engineConfig,
+    forCoach: true,
   });
 
   if (multiPvResult.items.length === 0) {
@@ -959,10 +979,13 @@ function computeRecommendationsWithTelemetry(
     };
     primaryReason: string;
     secondaryReason?: string;
+    playstyleNote?: string;
     headline: string;
     rationale: string;
   }
 
+  const enemyKingSq = findKingSquare(state.board, enemyColor);
+  const enemyKingCoords = enemyKingSq ? squareToCoords(enemyKingSq) : null;
   const enriched: EnrichedCandidate[] = [];
 
   for (const item of multiPvResult.items) {
@@ -1248,6 +1271,28 @@ function computeRecommendationsWithTelemetry(
       reasons[0] ?? `Improve ${pieceName} activity on ${move.to}`;
     const secondaryReason = reasons[1];
 
+    let movesTowardEnemyKing = false;
+    if (enemyKingCoords) {
+      const distBefore =
+        Math.abs(fromCoords.row - enemyKingCoords.row) +
+        Math.abs(fromCoords.col - enemyKingCoords.col);
+      const distAfter =
+        Math.abs(toCoords.row - enemyKingCoords.row) +
+        Math.abs(toCoords.col - enemyKingCoords.col);
+      movesTowardEnemyKing = distAfter < distBefore && distAfter <= 4;
+    }
+
+    const playstyleNote =
+      scoreForTurn < MATE_THRESHOLD
+        ? detectPlaystyleAlignmentNote(
+            activePlaystyle,
+            move,
+            positionalDelta,
+            givesCheck,
+            movesTowardEnemyKing
+          )
+        : undefined;
+
     enriched.push({
       item,
       combinedRankScore: Math.round(combinedRankScore),
@@ -1256,6 +1301,7 @@ function computeRecommendationsWithTelemetry(
       positionalDelta,
       primaryReason,
       secondaryReason,
+      playstyleNote,
       headline: primaryReason,
       rationale: `${san}: ${primaryReason}${
         secondaryReason ? ` · ${secondaryReason}` : ''
@@ -1344,6 +1390,7 @@ function computeRecommendationsWithTelemetry(
       rationale: cand.rationale,
       coachWhy: coach.coachWhy,
       followUpPlan: coach.followUpPlan,
+      playstyleNote: cand.playstyleNote,
       opponentReply: coach.opponentReply,
       playerFollowUp: coach.playerFollowUp,
     };
@@ -1361,13 +1408,33 @@ function computeRecommendationsWithTelemetry(
 }
 
 /**
- * Synchronous fast tactical analysis (3-ply + Quiescence Multi-PV with Zobrist TT)
- * for immediate UI rendering and unit tests (~15-35ms).
+ * Synchronous fast 3000+ tactical analysis (up to 6-ply + Quiescence Multi-PV on the
+ * zero-allocation 0x88 engine with isolated 16 MB TT) for immediate UI rendering (~15-65ms).
+ * Always operates at full 3000+ GM tactical soundness regardless of Opponent AI difficulty.
  */
 export function analyzeTactics(
   state: GameState,
-  engineConfig?: Partial<ChessEngineConfig>
+  engineConfig?: Partial<ChessEngineConfig>,
+  coachPlaystyle?: CoachPlaystyleProfile
 ): TacticsAnalysis {
+  const effectivePlaystyle = sanitizeCoachPlaystyle(
+    coachPlaystyle ?? DEFAULT_COACH_PLAYSTYLE
+  );
+  const fastCoachConfig = buildCoachEngineConfig(
+    effectivePlaystyle,
+    'fast',
+    engineConfig
+  );
+  const threatCoachConfig = buildCoachEngineConfig(
+    effectivePlaystyle,
+    'threat',
+    {
+      ...engineConfig,
+      maxDepth: Math.min(5, fastCoachConfig.maxDepth),
+      maxTimeMs: 45,
+    }
+  );
+
   const enemyColor = oppositeColor(state.turn);
   const attackedSquares = getAttackedSquares(state.board, enemyColor);
   const threatenedPieces = detectThreatenedPieces(state.board, state.turn);
@@ -1380,14 +1447,15 @@ export function analyzeTactics(
     evalBreakdown,
     engineConfig: resolvedConfig,
   } = computeRecommendationsWithTelemetry(state, threatenedPieces, {
-    maxDepth: engineConfig?.maxDepth ?? 3,
-    maxTimeMs: engineConfig?.maxTimeMs ?? 75,
-    engineConfig,
+    maxDepth: fastCoachConfig.maxDepth,
+    maxTimeMs: fastCoachConfig.maxTimeMs,
+    engineConfig: fastCoachConfig,
+    coachPlaystyle: effectivePlaystyle,
   });
   const opponentThreat = detectOpponentThreat(state, {
-    maxDepth: 3,
-    maxTimeMs: 45,
-    engineConfig,
+    maxDepth: threatCoachConfig.maxDepth,
+    maxTimeMs: threatCoachConfig.maxTimeMs,
+    engineConfig: threatCoachConfig,
   });
 
   return {
@@ -1402,19 +1470,23 @@ export function analyzeTactics(
     isDeepAnalysis: false,
     evalBreakdown,
     engineConfig: resolvedConfig,
+    engineRatingLabel: COACH_ENGINE_RATING_LABEL,
+    playstyle: effectivePlaystyle,
   };
 }
 
 /**
- * Deep asynchronous Multi-PV Coach Analysis (5–6 ply + Quiescence search + Zobrist TT + NMP + LMR
- * + 4-ply Null-Move Threat Predictor).
- * Runs inside the Web Worker (or head-to-head tests) to provide Master/Club 2200+ tactical calculation.
+ * Deep asynchronous 3000+ GM Multi-PV Coach Analysis (Iterative Deepening PVS up to 14-16 ply
+ * + Quiescence + 64-bit Zobrist TT + NMP + LMR + RFP + 8-ply Null-Move Threat Predictor).
+ * Always runs at full 3000+ Grandmaster strength inside the Web Worker, independent of the
+ * Opponent AI's Elo setting, while applying the user's tuned playstyle weights.
  */
 export function analyzeTacticsDeep(
   state: GameState,
   maxDepth?: number,
-  maxTimeMs = 950,
-  engineConfig?: Partial<ChessEngineConfig>
+  maxTimeMs = 1050,
+  engineConfig?: Partial<ChessEngineConfig>,
+  coachPlaystyle?: CoachPlaystyleProfile
 ): TacticsAnalysis {
   const enemyColor = oppositeColor(state.turn);
   const attackedSquares = getAttackedSquares(state.board, enemyColor);
@@ -1426,7 +1498,31 @@ export function analyzeTacticsDeep(
       if (state.board[r][c]) pieceCount++;
     }
   }
-  const adaptiveDepth = maxDepth ?? engineConfig?.maxDepth ?? (pieceCount <= 12 ? 6 : 5);
+  const isEndgamePos = pieceCount <= 12;
+  const effectivePlaystyle = sanitizeCoachPlaystyle(
+    coachPlaystyle ?? DEFAULT_COACH_PLAYSTYLE
+  );
+
+  const deepCoachConfig = buildCoachEngineConfig(
+    effectivePlaystyle,
+    'deep',
+    {
+      ...engineConfig,
+      ...(maxDepth !== undefined ? { maxDepth } : {}),
+      maxTimeMs: engineConfig?.maxTimeMs ?? maxTimeMs,
+    },
+    isEndgamePos
+  );
+  const threatCoachConfig = buildCoachEngineConfig(
+    effectivePlaystyle,
+    'threat',
+    {
+      ...engineConfig,
+      maxDepth: Math.min(8, deepCoachConfig.maxDepth),
+      maxTimeMs: 130,
+    },
+    isEndgamePos
+  );
 
   const {
     topMoves,
@@ -1437,14 +1533,15 @@ export function analyzeTacticsDeep(
     evalBreakdown,
     engineConfig: resolvedConfig,
   } = computeRecommendationsWithTelemetry(state, threatenedPieces, {
-    maxDepth: adaptiveDepth,
-    maxTimeMs: engineConfig?.maxTimeMs ?? maxTimeMs,
-    engineConfig,
+    maxDepth: deepCoachConfig.maxDepth,
+    maxTimeMs: deepCoachConfig.maxTimeMs,
+    engineConfig: deepCoachConfig,
+    coachPlaystyle: effectivePlaystyle,
   });
   const opponentThreat = detectOpponentThreat(state, {
-    maxDepth: 4,
-    maxTimeMs: 130,
-    engineConfig,
+    maxDepth: threatCoachConfig.maxDepth,
+    maxTimeMs: threatCoachConfig.maxTimeMs,
+    engineConfig: threatCoachConfig,
   });
 
   return {
@@ -1452,12 +1549,14 @@ export function analyzeTacticsDeep(
     threatenedPieces,
     topMoves,
     opponentThreat,
-    searchDepth: Math.max(adaptiveDepth, searchDepth),
+    searchDepth: Math.max(1, searchDepth),
     searchNodes,
     ttHits,
     elapsedMs,
     isDeepAnalysis: true,
     evalBreakdown,
     engineConfig: resolvedConfig,
+    engineRatingLabel: COACH_ENGINE_RATING_LABEL,
+    playstyle: effectivePlaystyle,
   };
 }

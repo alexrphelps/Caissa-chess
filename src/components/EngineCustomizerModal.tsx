@@ -146,12 +146,12 @@ export const EngineCustomizerModal: React.FC<EngineCustomizerModalProps> = ({
 
         {/* Scrollable Body */}
         <div className="p-5 overflow-y-auto space-y-5 flex-1">
-          {/* 1. Primary Control: Continuous Estimated Elo Slider (400 - 2400) + Quick Milestone Presets */}
+          {/* 1. Primary Control: Continuous Estimated Elo Slider (400 - 3000) + Quick Milestone Presets */}
           <section className="p-4 rounded-xl bg-[#18241E] border border-[#283830] space-y-3.5">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <span className="text-xs font-mono uppercase tracking-wider text-[#C6923A] font-bold">
-                  1. Primary Strength · Continuous Elo Slider (400 – 2400)
+                  1. Primary Strength · Continuous Elo Slider (400 – 3000)
                 </span>
                 <p className="text-xs text-[#A69F91] mt-0.5">
                   Automatically interpolates balanced depth, time budget, pruning, weights, and blunder rates.
@@ -187,7 +187,7 @@ export const EngineCustomizerModal: React.FC<EngineCustomizerModalProps> = ({
                 <span>1150 (Reactive)</span>
                 <span>1400 (Interm.)</span>
                 <span>1800 (Club)</span>
-                <span>2400 (Master+)</span>
+                <span>3000 (GM+)</span>
               </div>
             </div>
 
@@ -474,7 +474,7 @@ export const EngineCustomizerModal: React.FC<EngineCustomizerModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {WEIGHT_FIELDS.map((field) => {
-                const val = config.evalWeights[field.key];
+                const val = config.evalWeights[field.key] ?? 1.0;
                 return (
                   <div
                     key={field.key}
