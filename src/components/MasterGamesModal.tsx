@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import {
   FAMOUS_GAMES_LIBRARY,
+  getGameEra,
   parseFamousGameEntry,
 } from '../chess/famousGames';
 import {
@@ -19,6 +20,7 @@ import {
 } from '../chess/pgnParser';
 import {
   FamousGameEntry,
+  FamousGameEra,
   FamousGameTheme,
   ParsedPgnGame,
   PgnBatchGameError,
@@ -35,11 +37,21 @@ interface MasterGamesModalProps {
 const THEME_FILTERS: readonly ('All' | FamousGameTheme)[] = [
   'All',
   'Sacrifice',
-  'Positional',
   'Attack',
+  'Positional',
   'World Championship',
   'Endgame',
+  'Instructional',
 ];
+
+const ERA_FILTERS: readonly ('All Eras' | FamousGameEra)[] = [
+  'All Eras',
+  'Modern (2010–2024)',
+  'Classic (1950–2009)',
+  'Early (1851–1949)',
+];
+
+type SortOrder = 'curated' | 'newest' | 'oldest';
 
 export const MasterGamesModal: React.FC<MasterGamesModalProps> = ({
   isOpen,
@@ -53,6 +65,10 @@ export const MasterGamesModal: React.FC<MasterGamesModalProps> = ({
   const [selectedTheme, setSelectedTheme] = useState<'All' | FamousGameTheme>(
     'All'
   );
+  const [selectedEra, setSelectedEra] = useState<'All Eras' | FamousGameEra>(
+    'All Eras'
+  );
+  const [sortOrder, setSortOrder] = useState<SortOrder>('curated');
 
   // Import PGN tab state
   const [pgnInput, setPgnInput] = useState<string>('');
@@ -64,8 +80,11 @@ export const MasterGamesModal: React.FC<MasterGamesModalProps> = ({
 
   const filteredFamousGames = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return FAMOUS_GAMES_LIBRARY.filter((g) => {
+    const filtered = FAMOUS_GAMES_LIBRARY.filter((g) => {
       if (selectedTheme !== 'All' && g.theme !== selectedTheme) {
+        return false;
+      }
+      if (selectedEra !== 'All Eras' && getGameEra(g.year) !== selectedEra) {
         return false;
       }
       if (!q) return true;
@@ -79,13 +98,22 @@ export const MasterGamesModal: React.FC<MasterGamesModalProps> = ({
         g.eco,
         g.opening,
         g.theme,
+        g.keyMove ?? '',
         g.description,
       ]
         .join(' ')
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [searchQuery, selectedTheme]);
+
+    if (sortOrder === 'newest') {
+      return [...filtered].sort((a, b) => b.year - a.year);
+    }
+    if (sortOrder === 'oldest') {
+      return [...filtered].sort((a, b) => a.year - b.year);
+    }
+    return filtered;
+  }, [searchQuery, selectedTheme, selectedEra, sortOrder]);
 
   const filteredImportedGames = useMemo(() => {
     const q = batchFilter.trim().toLowerCase();
@@ -279,32 +307,94 @@ export const MasterGamesModal: React.FC<MasterGamesModalProps> = ({
         <div className="flex-1 min-h-0 overflow-y-auto p-5">
           {activeTab === 'library' ? (
             <div className="space-y-4">
-              {/* Search & Theme Filter Controls */}
-              <div className="flex flex-col md:flex-row md:items-center gap-3">
-                <div className="relative flex-1 min-w-0">
-                  <Search className="w-4 h-4 text-[#857F72] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by player, opening, event, or year (e.g. Carlsen, Fischer, Sicilian)..."
-                    aria-label="Search famous games"
-                    data-testid="famous-games-search"
-                    className="w-full h-10 pl-9 pr-8 rounded-lg bg-[#111815] border border-[#2C3C33] focus:border-[#C6923A] focus:outline-none text-sm text-[#F4EFE6] placeholder:text-[#7A7467]"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      aria-label="Clear search"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#857F72] hover:text-[#F4EFE6] cursor-pointer"
+              {/* Search, Era, Sort & Theme Filter Controls */}
+              <div className="space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="w-4 h-4 text-[#857F72] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search player, opening, event, or year (e.g. Gukesh, Carlsen, Ding, Sicilian, 2024)..."
+                      aria-label="Search famous games"
+                      data-testid="famous-games-search"
+                      className="w-full h-10 pl-9 pr-8 rounded-lg bg-[#111815] border border-[#2C3C33] focus:border-[#C6923A] focus:outline-none text-sm text-[#F4EFE6] placeholder:text-[#7A7467]"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        aria-label="Clear search"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#857F72] hover:text-[#F4EFE6] cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sort Order Selector */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <label
+                      htmlFor="famous-games-sort"
+                      className="text-xs text-[#857F72] whitespace-nowrap"
                     >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                      Sort:
+                    </label>
+                    <select
+                      id="famous-games-sort"
+                      data-testid="famous-games-sort"
+                      value={sortOrder}
+                      onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                      className="h-10 px-3 rounded-lg bg-[#111815] border border-[#2C3C33] focus:border-[#C6923A] focus:outline-none text-xs font-medium text-[#F4EFE6] cursor-pointer"
+                    >
+                      <option value="curated">Curated Showcase</option>
+                      <option value="newest">Newest First (2024 → 1851)</option>
+                      <option value="oldest">Oldest First (1851 → 2024)</option>
+                    </select>
+                  </div>
                 </div>
 
-                {/* Interactive Filter Tabs */}
+                {/* Era & Theme Interactive Filter Bars */}
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+                  <div
+                    role="group"
+                    aria-label="Filter by historical era"
+                    className="flex flex-wrap items-center gap-1 p-1 bg-[#111815] border border-[#26342C] rounded-lg"
+                  >
+                    {ERA_FILTERS.map((era) => {
+                      const isActive = selectedEra === era;
+                      const testSlug = era
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-|-$/g, '');
+                      return (
+                        <button
+                          key={era}
+                          type="button"
+                          data-testid={`era-filter-${testSlug}`}
+                          onClick={() => setSelectedEra(era)}
+                          className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                            isActive
+                              ? 'bg-[#C6923A] text-[#111815] font-bold'
+                              : 'text-[#A69F91] hover:text-[#F4EFE6] hover:bg-[#19241E]'
+                          }`}
+                        >
+                          {era}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <span
+                    data-testid="famous-games-count"
+                    className="text-xs font-mono text-[#857F72] tabular-nums whitespace-nowrap"
+                  >
+                    Showing {filteredFamousGames.length} of {FAMOUS_GAMES_LIBRARY.length} games
+                  </span>
+                </div>
+
+                {/* Theme Filter Tabs */}
                 <div
                   role="group"
                   aria-label="Filter by game theme"
@@ -338,13 +428,14 @@ export const MasterGamesModal: React.FC<MasterGamesModalProps> = ({
                     No famous games match your filter
                   </p>
                   <p className="text-xs text-[#A69F91] mt-1">
-                    Try clearing the search query or selecting &ldquo;All&rdquo; themes.
+                    Try clearing the search query or resetting era and theme filters.
                   </p>
                   <button
                     type="button"
                     onClick={() => {
                       setSearchQuery('');
                       setSelectedTheme('All');
+                      setSelectedEra('All Eras');
                     }}
                     className="mt-3 px-4 py-2 rounded-lg bg-[#212E27] hover:bg-[#2C3D34] border border-[#34463C] text-xs font-semibold text-[#F4EFE6] cursor-pointer"
                   >

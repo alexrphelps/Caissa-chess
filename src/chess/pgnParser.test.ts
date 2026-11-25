@@ -13,14 +13,24 @@ import {
 } from './famousGames';
 import { generateLegalMoves, makeMove } from './engine';
 
-test('all 12 preloaded famous games parse cleanly with zero errors and legal moves', () => {
-  assert.ok(FAMOUS_GAMES_LIBRARY.length >= 10);
+test('all 52 preloaded famous games parse cleanly with zero errors, unique IDs, and FIDE-legal moves', () => {
+  assert.ok(
+    FAMOUS_GAMES_LIBRARY.length >= 50,
+    `Expected at least 50 curated games, got ${FAMOUS_GAMES_LIBRARY.length}`
+  );
+
+  const seenIds = new Set<string>();
+  let modernCount = 0;
 
   for (const entry of FAMOUS_GAMES_LIBRARY) {
+    assert.ok(!seenIds.has(entry.id), `Duplicate game id: ${entry.id}`);
+    seenIds.add(entry.id);
+    if (entry.year >= 2010) modernCount += 1;
+
     const parsed = parseFamousGameEntry(entry);
     assert.ok(
-      parsed.timeline.length > 10,
-      `${entry.title} should have > 10 plies (got ${parsed.timeline.length})`
+      parsed.timeline.length >= 16,
+      `${entry.title} should have >= 16 plies (got ${parsed.timeline.length})`
     );
     assert.equal(
       parsed.result,
@@ -39,9 +49,14 @@ test('all 12 preloaded famous games parse cleanly with zero errors and legal mov
       assert.ok(node.fen.split(' ').length === 6);
     }
   }
+
+  assert.ok(
+    modernCount >= 18,
+    `Expected at least 18 modern (2010+) games, got ${modernCount}`
+  );
 });
 
-test('famous games hit iconic historical key moves and checkmates', () => {
+test('famous games hit iconic historical and modern key moves and checkmates', () => {
   // 1. Carlsen vs Topalov (Nanjing 2009): 30.h5
   const carlsenTopalov = parseFamousGameEntry(
     FAMOUS_GAMES_LIBRARY.find((g) => g.id === 'carlsen-topalov-nanjing-2009')!
@@ -88,6 +103,48 @@ test('famous games hit iconic historical key moves and checkmates', () => {
     (n) => n.turnNumber === 24 && n.color === 'w'
   );
   assert.equal(rxd4?.san, 'Rxd4');
+
+  // 6. Carlsen vs Karjakin (2016 WCh TB4): 50.Qh6+!!
+  const carlsenKarjakin = parseFamousGameEntry(
+    FAMOUS_GAMES_LIBRARY.find((g) => g.id === 'carlsen-karjakin-2016-tb4')!
+  );
+  const qh6 = carlsenKarjakin.timeline[carlsenKarjakin.timeline.length - 1];
+  assert.equal(qh6.san, 'Qh6+');
+  assert.equal(qh6.nag, '!!');
+
+  // 7. Ding Liren's Immortal (2017): ends in checkmate 35...Ng3#
+  const dingImmortal = parseFamousGameEntry(
+    FAMOUS_GAMES_LIBRARY.find((g) => g.id === 'bai-ding-2017')!
+  );
+  const dingFinal = dingImmortal.timeline[dingImmortal.timeline.length - 1];
+  assert.equal(dingFinal.san, 'Ng3#');
+  assert.equal(dingFinal.flags.checkmate, true);
+
+  // 8. Nepomniachtchi vs Ding (2023 WCh TB4): 46...Rg6!!
+  const dingTitle = parseFamousGameEntry(
+    FAMOUS_GAMES_LIBRARY.find((g) => g.id === 'nepomniachtchi-ding-2023-tb4')!
+  );
+  const rg6 = dingTitle.timeline.find(
+    (n) => n.turnNumber === 46 && n.color === 'b'
+  );
+  assert.equal(rg6?.san, 'Rg6');
+  assert.equal(rg6?.nag, '!!');
+
+  // 9. Edward Lasker vs Thomas (1912): King Walk ends in 18.Kd2#
+  const kingWalk = parseFamousGameEntry(
+    FAMOUS_GAMES_LIBRARY.find((g) => g.id === 'elasker-thomas-1912')!
+  );
+  const kingWalkFinal = kingWalk.timeline[kingWalk.timeline.length - 1];
+  assert.equal(kingWalkFinal.san, 'Kd2#');
+  assert.equal(kingWalkFinal.flags.checkmate, true);
+
+  // 10. Reti vs Tartakower (1910): 11-move double-check mate 11.Bd8#
+  const retiMate = parseFamousGameEntry(
+    FAMOUS_GAMES_LIBRARY.find((g) => g.id === 'reti-tartakower-1910')!
+  );
+  const retiFinal = retiMate.timeline[retiMate.timeline.length - 1];
+  assert.equal(retiFinal.san, 'Bd8#');
+  assert.equal(retiFinal.flags.checkmate, true);
 });
 
 test('handles comments, clock tags, NAGs, and nested RAV variations gracefully', () => {

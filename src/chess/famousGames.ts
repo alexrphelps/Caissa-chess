@@ -1,7 +1,9 @@
-import { FamousGameEntry, ParsedPgnGame } from './pgnTypes';
+import { FamousGameEntry, FamousGameEra, ParsedPgnGame } from './pgnTypes';
 import { parseSinglePgnGame } from './pgnParser';
+import { MODERN_MASTERPIECES } from './games/modernMasterpieces';
+import { INSTRUCTIONAL_CLASSICS } from './games/instructionalClassics';
 
-export const FAMOUS_GAMES_LIBRARY: FamousGameEntry[] = [
+const CORE_LANDMARK_GAMES: FamousGameEntry[] = [
   {
     id: 'carlsen-topalov-nanjing-2009',
     title: 'Carlsen vs. Topalov',
@@ -409,6 +411,22 @@ d4 21. f4 Qe7 22. e5 Rb8 23. Bc4 Kh8 24. Qh3 Nf8 25. b3 a5 26. f5 exf5
 Qxf3 20. Rxe7+ Nxe7 21. Qxd7+!! Kxd7 22. Bf5+ Ke8 23. Bd7+ Kf8 24. Bxe7# 1-0`,
   },
 ];
+
+/**
+ * Full offline Master Games Library (52 curated games across Modern 2010–2024,
+ * Classic 1950–2009, and Golden Age 1851–1949 eras).
+ */
+export const FAMOUS_GAMES_LIBRARY: FamousGameEntry[] = [
+  ...CORE_LANDMARK_GAMES,
+  ...MODERN_MASTERPIECES,
+  ...INSTRUCTIONAL_CLASSICS,
+];
+
+export function getGameEra(year: number): FamousGameEra {
+  if (year >= 2010) return 'Modern (2010–2024)';
+  if (year >= 1950) return 'Classic (1950–2009)';
+  return 'Early (1851–1949)';
+}
 
 /**
  * Parses a famous game library entry into a ready-to-play `ParsedPgnGame`

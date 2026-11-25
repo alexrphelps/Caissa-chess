@@ -71,7 +71,13 @@ export type FamousGameTheme =
   | 'Positional'
   | 'Endgame'
   | 'World Championship'
-  | 'Attack';
+  | 'Attack'
+  | 'Instructional';
+
+export type FamousGameEra =
+  | 'Modern (2010–2024)'
+  | 'Classic (1950–2009)'
+  | 'Early (1851–1949)';
 
 export interface FamousGameEntry {
   id: string;
@@ -89,6 +95,8 @@ export interface FamousGameEntry {
   description: string;
   pgn: string;
 }
+
+export type BranchPlayChoice = Color | 'both';
 
 export interface ReplayBranchOrigin {
   game: ParsedPgnGame;

@@ -16,7 +16,11 @@ import {
 } from 'lucide-react';
 import { calculateMaterialBalance } from '../chess/engine';
 import { describeEngineProfileSummary } from '../chess/evaluation';
-import { ParsedPgnGame, TimelineNode } from '../chess/pgnTypes';
+import {
+  BranchPlayChoice,
+  ParsedPgnGame,
+  TimelineNode,
+} from '../chess/pgnTypes';
 import { Color, EngineProfileState, Square } from '../chess/types';
 import {
   computeBoardGridSize,
@@ -44,7 +48,7 @@ interface ReplayModeViewProps {
   onOpenEngineCustomizer: () => void;
   onContinuePlayFromHere: (
     ply: number,
-    chosenPlayerColor: Color,
+    choice: BranchPlayChoice,
     shouldFlip: boolean
   ) => void;
   onExit: () => void;
@@ -84,9 +88,9 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
   const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(false);
   const [speedMs, setSpeedMs] = useState<number>(1200);
   const [isFlipped, setIsFlipped] = useState<boolean>(false);
-  const [colorChoiceForPly, setColorChoiceForPly] = useState<{
+  const [branchChoiceForPly, setBranchChoiceForPly] = useState<{
     ply: number;
-    color: Color;
+    choice: BranchPlayChoice;
   } | null>(null);
   const [replayHintToast, setReplayHintToast] = useState<string | null>(null);
 
@@ -99,7 +103,7 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
     const clamped = Math.max(0, Math.min(initialPly, game.timeline.length - 1));
     setCurrentPly(clamped);
     setIsAutoPlaying(false);
-    setColorChoiceForPly(null);
+    setBranchChoiceForPly(null);
   }, [game.id, initialPly, game.timeline.length]);
 
   const showHintToast = useCallback((msg: string) => {
@@ -217,9 +221,11 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
   const currentNode = game.timeline[currentPly] ?? game.timeline[0];
   const currentState = currentNode.gameState;
   const activeTurn = currentState.turn;
-  const chosenPlayColor: Color =
-    colorChoiceForPly && colorChoiceForPly.ply === currentPly
-      ? colorChoiceForPly.color
+  const chosenBranchChoice: BranchPlayChoice =
+    branchChoiceForPly?.choice === 'both'
+      ? 'both'
+      : branchChoiceForPly && branchChoiceForPly.ply === currentPly
+      ? branchChoiceForPly.choice
       : activeTurn;
   const isTerminalPosition = currentState.status !== 'playing';
   const engineSummary = describeEngineProfileSummary(engineProfile);
@@ -991,16 +997,25 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-bold text-[#F4EFE6]">
-                Branch Into Live AI Play
+                Branch Into Live Play
               </span>
-              <button
-                type="button"
-                data-testid="replay-tune-ai-btn"
-                onClick={onOpenEngineCustomizer}
-                className="text-[11px] font-mono text-[#C6923A] hover:text-[#E2B055] transition-colors cursor-pointer tabular-nums"
-              >
-                AI: {engineSummary.title} · Tune
-              </button>
+              {chosenBranchChoice === 'both' ? (
+                <span
+                  data-testid="replay-branch-mode-label"
+                  className="text-[11px] font-mono text-[#C6923A] tabular-nums"
+                >
+                  Pass &amp; Play · Both Sides
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="replay-tune-ai-btn"
+                  onClick={onOpenEngineCustomizer}
+                  className="text-[11px] font-mono text-[#C6923A] hover:text-[#E2B055] transition-colors cursor-pointer tabular-nums"
+                >
+                  AI: {engineSummary.title} · Tune
+                </button>
+              )}
             </div>
 
             {isTerminalPosition ? (
@@ -1014,41 +1029,77 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
             ) : (
               <>
                 {/* Choose Side to Play */}
-                <div className="grid grid-cols-2 gap-2 p-1 bg-[#18221D] border border-[#26342C] rounded-lg">
+                <div
+                  role="radiogroup"
+                  aria-label="Choose side to play when branching"
+                  className="grid grid-cols-3 gap-1.5 p-1 bg-[#18221D] border border-[#26342C] rounded-lg"
+                >
                   <button
                     type="button"
+                    role="radio"
+                    aria-checked={chosenBranchChoice === 'w'}
                     data-testid="branch-as-white-btn"
                     onClick={() =>
-                      setColorChoiceForPly({ ply: currentPly, color: 'w' })
+                      setBranchChoiceForPly({ ply: currentPly, choice: 'w' })
                     }
-                    className={`py-1.5 px-2.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
-                      chosenPlayColor === 'w'
+                    className={`py-1.5 px-1.5 sm:px-2 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+                      chosenBranchChoice === 'w'
                         ? 'bg-[#EADBC8] text-[#1A1410] font-bold'
                         : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#223028]'
                     }`}
                   >
-                    <span className="w-3 h-3 rounded-full bg-[#FCF9F2] border border-[#332B24] shrink-0" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#FCF9F2] border border-[#332B24] shrink-0" />
                     <span>Play as White</span>
                   </button>
                   <button
                     type="button"
+                    role="radio"
+                    aria-checked={chosenBranchChoice === 'b'}
                     data-testid="branch-as-black-btn"
                     onClick={() =>
-                      setColorChoiceForPly({ ply: currentPly, color: 'b' })
+                      setBranchChoiceForPly({ ply: currentPly, choice: 'b' })
                     }
-                    className={`py-1.5 px-2.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
-                      chosenPlayColor === 'b'
+                    className={`py-1.5 px-1.5 sm:px-2 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+                      chosenBranchChoice === 'b'
                         ? 'bg-[#EADBC8] text-[#1A1410] font-bold'
                         : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#223028]'
                     }`}
                   >
-                    <span className="w-3 h-3 rounded-full bg-[#22262A] border border-[#C8B9A6] shrink-0" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#22262A] border border-[#C8B9A6] shrink-0" />
                     <span>Play as Black</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={chosenBranchChoice === 'both'}
+                    data-testid="branch-as-both-btn"
+                    onClick={() =>
+                      setBranchChoiceForPly({ ply: currentPly, choice: 'both' })
+                    }
+                    className={`py-1.5 px-1.5 sm:px-2 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+                      chosenBranchChoice === 'both'
+                        ? 'bg-[#EADBC8] text-[#1A1410] font-bold'
+                        : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#223028]'
+                    }`}
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-[#C6923A] shrink-0"
+                      style={{
+                        background:
+                          'linear-gradient(90deg, #FCF9F2 50%, #22262A 50%)',
+                      }}
+                    />
+                    <span>Play as Both</span>
                   </button>
                 </div>
 
-                <p className="text-[11px] text-[#A69F91]">
-                  {chosenPlayColor === activeTurn
+                <p
+                  data-testid="replay-branch-helper-text"
+                  className="text-[11px] text-[#A69F91]"
+                >
+                  {chosenBranchChoice === 'both'
+                    ? `${activeTurn === 'w' ? 'White' : 'Black'} to move — you will control both White and Black (Pass & Play).`
+                    : chosenBranchChoice === activeTurn
                     ? `${activeTurn === 'w' ? 'White' : 'Black'} to move — you will make the first move.`
                     : `${activeTurn === 'w' ? 'White' : 'Black'} to move — AI will respond immediately as ${activeTurn === 'w' ? 'White' : 'Black'}.`}
                 </p>
@@ -1061,10 +1112,14 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
               disabled={isTerminalPosition}
               onClick={() => {
                 setIsAutoPlaying(false);
+                const shouldFlipBoard =
+                  chosenBranchChoice === 'both'
+                    ? isFlipped
+                    : chosenBranchChoice === 'b';
                 onContinuePlayFromHere(
                   currentPly,
-                  chosenPlayColor,
-                  chosenPlayColor === 'b'
+                  chosenBranchChoice,
+                  shouldFlipBoard
                 );
               }}
               className="w-full py-3 px-4 rounded-xl bg-[#C6923A] hover:bg-[#D4A048] active:bg-[#B5822D] disabled:opacity-40 disabled:pointer-events-none text-[#111815] font-bold text-sm tracking-wide transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-[0_6px_18px_rgba(198,146,58,0.25)] whitespace-nowrap"

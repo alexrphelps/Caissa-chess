@@ -75,7 +75,11 @@ import {
   buildStateStackUpToPly,
   formatPgnGameSummary,
 } from './chess/pgnParser';
-import { ParsedPgnGame, ReplayBranchOrigin } from './chess/pgnTypes';
+import {
+  BranchPlayChoice,
+  ParsedPgnGame,
+  ReplayBranchOrigin,
+} from './chess/pgnTypes';
 import { BoardCustomizerModal } from './components/BoardCustomizerModal';
 import { ChessBoard } from './components/ChessBoard';
 import { EngineCustomizerModal } from './components/EngineCustomizerModal';
@@ -1041,10 +1045,17 @@ export default function App() {
   );
 
   const handleContinuePlayFromHere = useCallback(
-    (ply: number, chosenPlayerColor: Color, shouldFlip: boolean) => {
+    (ply: number, choice: BranchPlayChoice, shouldFlip: boolean) => {
       if (!activeReplayGame) return;
       const branchStack = buildStateStackUpToPly(activeReplayGame, ply);
       if (branchStack.length === 0) return;
+
+      const nextGameMode: GameMode =
+        choice === 'both' ? 'pass_and_play' : 'ai';
+      const nextPlayerColor: Color =
+        choice === 'both'
+          ? branchStack[branchStack.length - 1].turn
+          : choice;
 
       clearPendingTimers();
       setIsAIThinking(false);
@@ -1060,8 +1071,8 @@ export default function App() {
       setRetryBlunderSession(null);
 
       setStateStack(branchStack);
-      setGameMode('ai');
-      setPlayerColor(chosenPlayerColor);
+      setGameMode(nextGameMode);
+      setPlayerColor(nextPlayerColor);
       setIsFlipped(shouldFlip);
       setReplayBranchOrigin({ game: activeReplayGame, branchPly: ply });
       setShellState('playing');
@@ -1069,8 +1080,8 @@ export default function App() {
 
       const branchSession = createStoredSession({
         stateStack: branchStack,
-        gameMode: 'ai',
-        playerColor: chosenPlayerColor,
+        gameMode: nextGameMode,
+        playerColor: nextPlayerColor,
         isFlipped: shouldFlip,
         engineProfile,
         customTitle: `${activeReplayGame.headers.White} vs. ${activeReplayGame.headers.Black} (Ply ${ply})`,
@@ -1080,9 +1091,9 @@ export default function App() {
       setActiveSession(branchSession);
       soundFX.playMove();
       showToast(
-        `Playing as ${
-          chosenPlayerColor === 'w' ? 'White' : 'Black'
-        } from ply ${ply}`
+        choice === 'both'
+          ? `Playing as both sides from ply ${ply}`
+          : `Playing as ${choice === 'w' ? 'White' : 'Black'} from ply ${ply}`
       );
     },
     [activeReplayGame, clearPendingTimers, engineProfile, showToast]
