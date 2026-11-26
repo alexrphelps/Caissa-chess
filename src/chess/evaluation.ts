@@ -192,52 +192,54 @@ export function interpolateEngineConfigFromElo(rawElo: number): ChessEngineConfi
   // 1. Search Depth scaling smoothly from 1 ply (400 Elo) up to 20 ply (3000 Elo)
   let maxDepth = 1;
   if (elo >= 2900) maxDepth = 20;
-  else if (elo >= 2700) maxDepth = 16;
-  else if (elo >= 2500) maxDepth = 12;
-  else if (elo >= 2300) maxDepth = 9;
-  else if (elo >= 2100) maxDepth = 7;
-  else if (elo >= 1750) maxDepth = 5;
-  else if (elo >= 1450) maxDepth = 4;
-  else if (elo >= 1200) maxDepth = 3;
+  else if (elo >= 2750) maxDepth = 16;
+  else if (elo >= 2550) maxDepth = 12;
+  else if (elo >= 2350) maxDepth = 9;
+  else if (elo >= 2150) maxDepth = 7;
+  else if (elo >= 1900) maxDepth = 5;
+  else if (elo >= 1600) maxDepth = 4;
+  else if (elo >= 1300) maxDepth = 3;
   else if (elo >= 700) maxDepth = 2;
 
-  // 2. Time Budget (smoothly scales from 200ms at 400 Elo to 1600ms at 3000 Elo)
-  const maxTimeMs = Math.round(200 + Math.pow(t, 1.2) * 1400);
+  // 2. Time Budget (smoothly scales from 180ms at 400 Elo to 1600ms at 3000 Elo)
+  const maxTimeMs = Math.round(180 + Math.pow(t, 1.25) * 1420);
 
   // 3. Tactical & Pruning Toggles
-  // Enable Quiescence from 950 Elo upward so the bot resolves capture chains and makes sound trades!
-  const enableQuiescence = elo >= 950;
-  const enableTranspositionTable = elo >= 800;
-  const enableLMR = elo >= 1350;
+  // Enable Quiescence at 1450+ Elo so beginner/casual tiers (700-1400) don't abruptly jump
+  // to club-strength capture-chain calculation at 950-1150 Elo.
+  const enableQuiescence = elo >= 1450;
+  const enableTranspositionTable = elo >= 900;
+  const enableLMR = elo >= 1450;
   const enableNullMovePruning = elo >= 1750;
 
   // 4. Evaluation Weight Multipliers (0.0 - 2.0)
   const material = 1.0;
   const pieceSquareTables =
-    elo < 550
-      ? 0.0
-      : roundToTwo(Math.min(1.0, ((elo - 500) / 1100) * 1.0));
-  const kingSafety =
     elo < 600
       ? 0.0
-      : roundToTwo(Math.min(1.0, ((elo - 550) / 1050) * 1.0));
-  const pawnStructure =
-    elo < 650
-      ? 0.0
-      : roundToTwo(Math.min(1.0, ((elo - 600) / 1200) * 1.0));
-  const mobility =
+      : roundToTwo(Math.min(1.0, ((elo - 550) / 1250) * 1.0));
+  const kingSafety =
     elo < 700
       ? 0.0
-      : roundToTwo(Math.min(1.0, ((elo - 650) / 1250) * 1.0));
+      : roundToTwo(Math.min(1.0, ((elo - 650) / 1150) * 1.0));
+  const pawnStructure =
+    elo < 800
+      ? 0.0
+      : roundToTwo(Math.min(1.0, ((elo - 750) / 1200) * 1.0));
+  const mobility =
+    elo < 850
+      ? 0.0
+      : roundToTwo(Math.min(1.0, ((elo - 800) / 1200) * 1.0));
 
   // 5. Humanization & Blunder Modeling
-  // Smooth decay from 0.42 at 400 Elo down to 0.0 at 2050+ Elo
+  // Smooth decay from 400 Elo down to 0 at 2150+ Elo so 600-1400 bots make realistic
+  // human inaccuracies and occasional tactical oversights proportional to their rating.
   let errorProbability = 0.0;
   let errorMarginCentipawns = 0;
-  if (elo < 2050) {
-    const u = (2050 - elo) / (2050 - MIN_ENGINE_ELO); // 1.0 at 400, 0.0 at 2050
-    errorProbability = roundToTwo(Math.min(0.45, Math.pow(u, 1.75) * 0.42));
-    errorMarginCentipawns = Math.round(Math.pow(u, 1.9) * 230);
+  if (elo < 2150) {
+    const u = (2150 - elo) / (2150 - MIN_ENGINE_ELO); // 1.0 at 400, 0.0 at 2150
+    errorProbability = roundToTwo(Math.min(0.46, Math.pow(u, 1.35) * 0.46));
+    errorMarginCentipawns = Math.round(Math.pow(u, 1.45) * 420);
   }
 
   return {
@@ -404,6 +406,27 @@ export function createEngineProfileFromElo(rawElo: number): EngineProfileState {
   if (matchingPreset) {
     return createEngineProfileFromPreset(matchingPreset.id);
   }
+  return {
+    elo,
+    presetId: 'custom',
+    isCustom: false,
+    activeSavedProfileId: null,
+    config: interpolateEngineConfigFromElo(elo),
+  };
+}
+
+/**
+ * Creates a strictly monotonic, continuously interpolated EngineProfileState for Rated Journey
+ * matches so stepping across milestone boundaries (like 1150 Elo) never abruptly snaps to a
+ * specialized zero-blunder preset such as Reactive.
+ */
+export function createRatedOpponentProfileFromElo(
+  rawElo: number
+): EngineProfileState {
+  const elo = Math.max(
+    MIN_ENGINE_ELO,
+    Math.min(MAX_ENGINE_ELO, Math.round(rawElo))
+  );
   return {
     elo,
     presetId: 'custom',

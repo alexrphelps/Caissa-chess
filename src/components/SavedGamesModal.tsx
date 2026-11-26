@@ -323,7 +323,7 @@ export const SavedGamesModal: React.FC<SavedGamesModalProps> = ({
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
                   <span className="px-1.5 py-0.5 rounded bg-[#4ADE80]/20 text-[#4ADE80] border border-[#4ADE80]/30 text-[10px] font-mono font-bold">
-                    AUTO-SAVE RESUME
+                    {activeSession.ratedJourney ? 'RATED AUTO-SAVE' : 'AUTO-SAVE RESUME'}
                   </span>
                   <span className="text-xs font-bold text-[#F4EFE6] truncate">
                     {activeSession.title}
@@ -331,7 +331,9 @@ export const SavedGamesModal: React.FC<SavedGamesModalProps> = ({
                 </div>
                 <div className="text-[11px] font-mono text-[#A69F91]">
                   Move {activeSession.fullMoveNumber} · {activeSession.plyCount} Plies ·{' '}
-                  {activeSession.gameMode === 'ai'
+                  {activeSession.ratedJourney
+                    ? `Rated vs AI ${activeSession.ratedJourney.opponentElo} Elo · Undos ${activeSession.ratedJourney.undosRemaining}/${activeSession.ratedJourney.undosAllowed}`
+                    : activeSession.gameMode === 'ai'
                     ? `vs AI (${activeSession.engineProfile?.elo ?? 1000} Elo)`
                     : '2-Player'}{' '}
                   · Last saved {new Date(activeSession.updatedAt).toLocaleTimeString()}
@@ -464,6 +466,11 @@ export const SavedGamesModal: React.FC<SavedGamesModalProps> = ({
                         )}
 
                         <div className="flex items-center gap-2 shrink-0">
+                          {session.ratedJourney && (
+                            <span className="text-[10px] font-mono font-bold text-[#4ADE80] whitespace-nowrap">
+                              Rated
+                            </span>
+                          )}
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
                               session.status === 'checkmate'

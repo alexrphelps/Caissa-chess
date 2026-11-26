@@ -13,6 +13,10 @@ import {
   GameMode,
   StoredGameSession,
 } from '../chess/types';
+import {
+  getRankTierForRating,
+  RatedJourneyProfile,
+} from '../chess/ratedJourney';
 import { ChessPieceSvg } from './ChessPieceSvg';
 
 interface TitleScreenProps {
@@ -22,6 +26,7 @@ interface TitleScreenProps {
   engineProfile: EngineProfileState;
   activeSession?: StoredGameSession | null;
   savedSessionsCount?: number;
+  journeyProfile?: RatedJourneyProfile;
   onSelectMode: (mode: GameMode) => void;
   onSelectColor: (color: Color) => void;
   onSelectDifficulty: (difficulty: AIDifficulty) => void;
@@ -32,6 +37,7 @@ interface TitleScreenProps {
   onResumeActiveGame?: () => void;
   onOpenPuzzles?: () => void;
   onOpenMasterGames?: () => void;
+  onOpenJourney?: () => void;
   onStartGame: () => void;
 }
 
@@ -41,6 +47,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   engineProfile,
   activeSession,
   savedSessionsCount = 0,
+  journeyProfile,
   onSelectMode,
   onSelectColor,
   onSelectPreset,
@@ -50,10 +57,14 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   onResumeActiveGame,
   onOpenPuzzles,
   onOpenMasterGames,
+  onOpenJourney,
   onStartGame,
 }) => {
   const [hoveredPiece, setHoveredPiece] = useState<number | null>(null);
   const summary = describeEngineProfileSummary(engineProfile);
+  const journeyTier = journeyProfile?.initialized
+    ? getRankTierForRating(journeyProfile.rating)
+    : null;
 
   const showcaseSquares: {
     sq: string;
@@ -390,7 +401,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#4ADE80] animate-pulse shrink-0" />
                     <span className="text-[10px] font-mono uppercase tracking-wider text-[#4ADE80] font-bold">
-                      Unfinished Session in Progress
+                      {activeSession.ratedJourney
+                        ? 'Rated Journey Match in Progress'
+                        : 'Unfinished Session in Progress'}
                     </span>
                   </div>
                   <div className="text-xs font-bold text-[#F4EFE6] truncate mt-0.5">
@@ -398,7 +411,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                   </div>
                   <div className="text-[11px] font-mono text-[#A69F91]">
                     Move {activeSession.fullMoveNumber} · {activeSession.plyCount} Plies ·{' '}
-                    {activeSession.gameMode === 'ai'
+                    {activeSession.ratedJourney
+                      ? `Rated vs. AI ${activeSession.ratedJourney.opponentElo} Elo · Undos ${activeSession.ratedJourney.undosRemaining}/${activeSession.ratedJourney.undosAllowed}`
+                      : activeSession.gameMode === 'ai'
                       ? `vs. AI (${activeSession.engineProfile?.elo ?? 1000} Elo)`
                       : '2-Player Local'}{' '}
                     · {activeSession.turn === 'w' ? 'White' : 'Black'} to move
@@ -411,7 +426,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                   onClick={onResumeActiveGame}
                   className="px-4 py-2.5 rounded-lg bg-[#4ADE80] hover:bg-[#38C66E] active:bg-[#2CA85A] text-[#0D1E14] font-bold text-xs whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-sm flex items-center gap-1"
                 >
-                  <span>Resume Match</span>
+                  <span>
+                    {activeSession.ratedJourney ? 'Resume Rated' : 'Resume Match'}
+                  </span>
                   <span>→</span>
                 </button>
               </div>
@@ -419,17 +436,39 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
             {/* Primary Start & Mode Actions */}
             <div className="pt-1 space-y-2.5">
-              <button
-                type="button"
-                data-start="true"
-                onClick={(e) => {
-                  e.currentTarget.blur();
-                  onStartGame();
-                }}
-                className="w-full py-3.5 px-6 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] active:bg-[#B5822D] text-[#111815] font-bold text-base tracking-wide transition-transform duration-150 cursor-pointer shadow-[0_6px_20px_rgba(198,146,58,0.28)] whitespace-nowrap text-center"
-              >
-                Start New Match
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  data-start="true"
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    onStartGame();
+                  }}
+                  className="w-full py-3.5 px-5 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] active:bg-[#B5822D] text-[#111815] font-bold text-sm tracking-wide transition-colors duration-150 cursor-pointer shadow-[0_6px_20px_rgba(198,146,58,0.28)] whitespace-nowrap text-center"
+                >
+                  Start Custom Match
+                </button>
+
+                {onOpenJourney && (
+                  <button
+                    type="button"
+                    data-testid="title-rated-journey-btn"
+                    onClick={onOpenJourney}
+                    className="w-full py-3.5 px-5 rounded-lg bg-[#1A2D23] hover:bg-[#223B2E] border border-[#4ADE80]/55 text-[#F4EFE6] font-bold text-sm tracking-wide transition-colors duration-150 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
+                  >
+                    <span>Rated Journey</span>
+                    {journeyProfile?.initialized && journeyTier ? (
+                      <span className="text-xs font-mono font-bold text-[#4ADE80] tabular-nums">
+                        · {journeyProfile.rating} Elo
+                      </span>
+                    ) : (
+                      <span className="text-xs font-mono text-[#4ADE80]">
+                        · Climb
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {onOpenMasterGames && (
@@ -531,7 +570,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
       {/* Flat borderless inline control hint at bottom safe margin */}
       <div className="relative z-10 text-center text-xs text-[#A69F91] tracking-wide font-mono">
-        Click or Drag to Move · P Pause · R New Game · F Flip Board · Enter Start
+        Click or Drag to Move · P Pause · R New Game · T Rotate 90° · F Flip Board · Enter Start
       </div>
     </div>
   );

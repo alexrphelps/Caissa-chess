@@ -1,5 +1,6 @@
 import React from 'react';
 import { calculateMaterialBalance } from '../chess/engine';
+import { RatedMatchResultSummary } from '../chess/ratedJourney';
 import { Color, GameMode, GameState, ShellState } from '../chess/types';
 
 interface StatusModalProps {
@@ -7,6 +8,10 @@ interface StatusModalProps {
   gameState: GameState;
   gameMode: GameMode;
   playerColor: Color;
+  isRatedJourneyGame?: boolean;
+  isScoringRatedMatch?: boolean;
+  ratedScoringProgress?: { completed: number; total: number } | null;
+  ratedMatchSummary?: RatedMatchResultSummary | null;
   onResume: () => void;
   onNewGame: () => void;
   onReturnToTitle: () => void;
@@ -14,6 +19,8 @@ interface StatusModalProps {
   onOpenSavedGames?: () => void;
   onOpenGameReview?: () => void;
   onOpenInReplay?: () => void;
+  onNextRatedMatch?: () => void;
+  onOpenJourneyHub?: () => void;
 }
 
 export const StatusModal: React.FC<StatusModalProps> = ({
@@ -21,6 +28,10 @@ export const StatusModal: React.FC<StatusModalProps> = ({
   gameState,
   gameMode,
   playerColor,
+  isRatedJourneyGame = false,
+  isScoringRatedMatch = false,
+  ratedScoringProgress = null,
+  ratedMatchSummary = null,
   onResume,
   onNewGame,
   onReturnToTitle,
@@ -28,6 +39,8 @@ export const StatusModal: React.FC<StatusModalProps> = ({
   onOpenSavedGames,
   onOpenGameReview,
   onOpenInReplay,
+  onNextRatedMatch,
+  onOpenJourneyHub,
 }) => {
   if (shellState !== 'paused' && shellState !== 'gameover') {
     return null;
@@ -136,7 +149,17 @@ export const StatusModal: React.FC<StatusModalProps> = ({
   let outcomeTitle = 'Game Over';
   let outcomeReason = '';
 
-  if (gameState.status === 'checkmate') {
+  if (ratedMatchSummary?.termination === 'resignation') {
+    outcomeKicker = 'RATED MATCH · RESIGNATION';
+    outcomeTitle = 'You Resigned the Match';
+    outcomeReason = `Concluded on move ${fullMoves} against AI ${ratedMatchSummary.opponentElo} Elo.`;
+  } else if (ratedMatchSummary?.wasAbortedTooShort) {
+    outcomeKicker = 'RATED MATCH · ABORTED EARLY';
+    outcomeTitle = 'Match Ended Early (Unrated)';
+    outcomeReason = `Fewer than 6 player moves were played (${ratedMatchSummary.playerMoves} ${
+      ratedMatchSummary.playerMoves === 1 ? 'move' : 'moves'
+    }), so your rating was not affected.`;
+  } else if (gameState.status === 'checkmate') {
     const winnerName = gameState.winner === 'w' ? 'White' : 'Black';
     if (gameMode === 'ai') {
       const playerWon = gameState.winner === playerColor;
@@ -182,9 +205,9 @@ export const StatusModal: React.FC<StatusModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label={outcomeTitle}
-      className="fixed inset-0 z-40 bg-[#0B100E]/80 flex items-center justify-center p-4"
+      className="fixed inset-0 z-40 bg-[#0B100E]/80 flex items-center justify-center p-4 overflow-y-auto"
     >
-      <div className="w-full max-w-md bg-[#17211C] border-2 border-[#C6923A] rounded-xl p-6 shadow-[0_24px_60px_rgba(0,0,0,0.85)] space-y-6 text-center">
+      <div className="w-full max-w-md bg-[#17211C] border-2 border-[#C6923A] rounded-xl p-6 shadow-[0_24px_60px_rgba(0,0,0,0.85)] space-y-5 text-center my-auto">
         <div className="space-y-1.5">
           <span className="text-xs font-mono uppercase tracking-[0.2em] text-[#C6923A]">
             {outcomeKicker}
@@ -231,15 +254,173 @@ export const StatusModal: React.FC<StatusModalProps> = ({
           </div>
         </div>
 
-        <div className="space-y-2.5">
-          <button
-            type="button"
-            data-start="true"
-            onClick={onNewGame}
-            className="w-full py-3 px-5 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] text-[#111815] font-bold text-sm transition-colors cursor-pointer whitespace-nowrap shrink-0"
+        {/* Rated Journey Post-Game Rating Card */}
+        {isRatedJourneyGame && (
+          <div
+            data-testid="rated-match-summary-card"
+            className="p-4 rounded-xl bg-[#121A16] border border-[#2D4036] space-y-3 text-left"
           >
-            Play Again
-          </button>
+            {isScoringRatedMatch || !ratedMatchSummary ? (
+              <div className="py-2 text-center space-y-1.5">
+                <div className="text-xs font-mono font-semibold text-[#C6923A]">
+                  Evaluating move accuracy & updating rating...
+                </div>
+                {ratedScoringProgress && ratedScoringProgress.total > 0 && (
+                  <div className="text-[11px] font-mono text-[#A69F91] tabular-nums">
+                    Scored {ratedScoringProgress.completed} /{' '}
+                    {ratedScoringProgress.total} player moves
+                  </div>
+                )}
+              </div>
+            ) : ratedMatchSummary.wasAbortedTooShort ? (
+              <div className="space-y-1 text-center">
+                <div className="text-xs font-mono font-bold text-[#EADBC8]">
+                  Rating Unchanged · {ratedMatchSummary.ratingAfter} Elo
+                </div>
+                <div className="text-[11px] text-[#A69F91]">
+                  Play at least 6 moves for a resignation to count toward your
+                  Rated Journey.
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-baseline justify-between gap-2 pb-2.5 border-b border-[#223029]">
+                  <div>
+                    <div className="text-[11px] font-mono text-[#A69F91]">
+                      Updated Rating ·{' '}
+                      {ratedMatchSummary.isProvisionalAfter
+                        ? `Provisional (${ratedMatchSummary.placementCountAfter}/5)`
+                        : 'Established'}
+                    </div>
+                    <div className="flex items-baseline gap-2 mt-0.5 font-mono tabular-nums">
+                      <span className="text-xs text-[#8E8779]">
+                        {ratedMatchSummary.ratingBefore}
+                      </span>
+                      <span className="text-xs text-[#8E8779]">→</span>
+                      <span
+                        data-testid="rated-summary-new-elo"
+                        className="text-2xl font-bold text-[#F4EFE6]"
+                      >
+                        {ratedMatchSummary.ratingAfter}
+                      </span>
+                      <span className="text-[11px] text-[#A69F91]">
+                        ±{ratedMatchSummary.rdAfter}
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    data-testid="rated-summary-delta"
+                    className={`text-lg font-mono font-bold tabular-nums ${
+                      ratedMatchSummary.delta > 0
+                        ? 'text-[#4ADE80]'
+                        : ratedMatchSummary.delta < 0
+                        ? 'text-[#F87171]'
+                        : 'text-[#EADBC8]'
+                    }`}
+                  >
+                    {ratedMatchSummary.delta > 0
+                      ? `+${ratedMatchSummary.delta}`
+                      : ratedMatchSummary.delta}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center font-mono tabular-nums">
+                  <div className="py-1.5 px-2 rounded bg-[#17221C]">
+                    <div className="text-[10px] text-[#8E8779]">ACCURACY</div>
+                    <div className="text-xs font-bold text-[#4ADE80] mt-0.5">
+                      {ratedMatchSummary.accuracy}%
+                    </div>
+                  </div>
+                  <div className="py-1.5 px-2 rounded bg-[#17221C]">
+                    <div className="text-[10px] text-[#8E8779]">PERF ELO</div>
+                    <div className="text-xs font-bold text-[#F4EFE6] mt-0.5">
+                      {ratedMatchSummary.performanceRating}
+                    </div>
+                  </div>
+                  <div className="py-1.5 px-2 rounded bg-[#17221C]">
+                    <div className="text-[10px] text-[#8E8779]">UNDOS USED</div>
+                    <div className="text-xs font-bold text-[#C6923A] mt-0.5">
+                      {ratedMatchSummary.undosUsed}/
+                      {ratedMatchSummary.undosAllowed}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-[#A69F91] font-mono tabular-nums flex items-center justify-between gap-2">
+                  <span>
+                    Blunders: {ratedMatchSummary.blunders} · Mistakes:{' '}
+                    {ratedMatchSummary.mistakes}
+                  </span>
+                  {ratedMatchSummary.undoPenaltyPct > 0 && (
+                    <span className="text-[#FACC15]">
+                      -{ratedMatchSummary.undoPenaltyPct}% undo dampening
+                    </span>
+                  )}
+                </div>
+
+                {(ratedMatchSummary.promotedTier ||
+                  ratedMatchSummary.undoBudgetChanged ||
+                  ratedMatchSummary.blunderAlertsGraduated) && (
+                  <div className="pt-2 border-t border-[#223029] space-y-1 text-xs">
+                    {ratedMatchSummary.promotedTier && (
+                      <div className="font-semibold text-[#4ADE80]">
+                        Rank Promoted: {ratedMatchSummary.tierAfter.name}!
+                      </div>
+                    )}
+                    {ratedMatchSummary.undoBudgetChanged && (
+                      <div className="text-[#C6923A] font-mono text-[11px] tabular-nums">
+                        Undo allowance adjusted: {ratedMatchSummary.undosBefore}{' '}
+                        → {ratedMatchSummary.undosAfter} per game
+                      </div>
+                    )}
+                    {ratedMatchSummary.blunderAlertsGraduated && (
+                      <div className="text-[#EADBC8] text-[11px]">
+                        Graduated past 1000 Elo — Blunder Alerts are now off.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-2.5">
+          {isRatedJourneyGame && onNextRatedMatch ? (
+            <button
+              type="button"
+              data-start="true"
+              data-testid="gameover-next-rated-btn"
+              disabled={isScoringRatedMatch}
+              onClick={onNextRatedMatch}
+              className="w-full py-3 px-5 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] disabled:opacity-60 text-[#111815] font-bold text-sm transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              {ratedMatchSummary
+                ? `Next Match · vs. AI ${ratedMatchSummary.nextOpponentElo} Elo (${
+                    ratedMatchSummary.nextColor === 'w' ? 'White' : 'Black'
+                  })`
+                : 'Next Rated Match'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              data-start="true"
+              onClick={onNewGame}
+              className="w-full py-3 px-5 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] text-[#111815] font-bold text-sm transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              Play Again
+            </button>
+          )}
+          {isRatedJourneyGame && onOpenJourneyHub && (
+            <button
+              type="button"
+              data-testid="gameover-journey-hub-btn"
+              onClick={onOpenJourneyHub}
+              className="w-full py-2.5 px-4 rounded-lg bg-[#1D2B24] hover:bg-[#273930] border border-[#4ADE80]/50 text-xs font-semibold text-[#4ADE80] transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Open Rated Journey Hub
+            </button>
+          )}
           {onOpenGameReview && (
             <button
               type="button"

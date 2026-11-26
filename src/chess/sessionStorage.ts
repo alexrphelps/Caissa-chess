@@ -7,12 +7,15 @@ import {
 import { createEngineProfileFromPreset, describeEngineProfileSummary } from './evaluation';
 import { analyzeOpeningAndStrategy } from './openingBook';
 import {
+  BoardRotation,
   Color,
   EngineProfileState,
   GameMode,
   GameState,
+  RatedSessionMetadata,
   StoredGameSession,
 } from './types';
+import { normalizeBoardRotation } from '../utils/boardOrientation';
 
 export const ACTIVE_SESSION_STORAGE_KEY = 'caissa_active_session';
 export const SAVED_SESSIONS_STORAGE_KEY = 'caissa_saved_sessions';
@@ -69,11 +72,25 @@ export function generateSessionTitle(
   state: GameState,
   mode: GameMode,
   playerColor: Color,
-  engineProfile?: EngineProfileState
+  engineProfile?: EngineProfileState,
+  ratedJourney?: RatedSessionMetadata
 ): string {
   const opening = analyzeOpeningAndStrategy(state);
   const moveCount = state.fullMoveNumber;
   const plies = state.moveHistory.length;
+
+  if (ratedJourney) {
+    if (state.status === 'checkmate') {
+      const playerWon = state.winner === playerColor;
+      return `Rated vs. AI ${ratedJourney.opponentElo} Elo · ${
+        playerWon ? 'Win' : 'Loss'
+      }`;
+    }
+    if (state.status.startsWith('draw')) {
+      return `Rated vs. AI ${ratedJourney.opponentElo} Elo · Draw`;
+    }
+    return `Rated vs. AI ${ratedJourney.opponentElo} Elo · Move ${moveCount}`;
+  }
 
   if (state.status === 'checkmate') {
     const winnerName = state.winner === 'w' ? 'White' : 'Black';
@@ -103,6 +120,76 @@ export function generateSessionTitle(
   }
 
   return `Chess Session · Ply ${plies}`;
+}
+
+/**
+ * Sanitizes ratedJourney metadata from serialized storage, including a safe
+ * backwards-compatible fallback for pre-existing Rated Challenger auto-saves.
+ */
+export function normalizeRatedSessionMetadata(
+  raw: unknown,
+  fallbackEngineProfile?: EngineProfileState,
+  fallbackTitle?: string,
+  fallbackStatus?: GameState['status']
+): RatedSessionMetadata | undefined {
+  if (raw && typeof raw === 'object') {
+    const candidate = raw as Partial<RatedSessionMetadata>;
+    const rawOpp = Number(candidate.opponentElo);
+    const opponentElo = Number.isFinite(rawOpp)
+      ? Math.max(400, Math.min(3000, Math.round(rawOpp)))
+      : Math.max(400, Math.min(3000, Math.round(fallbackEngineProfile?.elo ?? 600)));
+    const rawAllowed = Number(candidate.undosAllowed);
+    const undosAllowed = Number.isFinite(rawAllowed)
+      ? Math.max(0, Math.min(3, Math.round(rawAllowed)))
+      : 3;
+    const rawUsed = Number(candidate.undosUsed);
+    const undosUsed = Number.isFinite(rawUsed) ? Math.max(0, Math.round(rawUsed)) : 0;
+    const rawRemaining = Number(candidate.undosRemaining);
+    const undosRemaining = Number.isFinite(rawRemaining)
+      ? Math.max(0, Math.min(undosAllowed, Math.round(rawRemaining)))
+      : Math.max(0, undosAllowed - undosUsed);
+    const isFinalized =
+      typeof candidate.isFinalized === 'boolean'
+        ? candidate.isFinalized
+        : fallbackStatus !== undefined && fallbackStatus !== 'playing';
+    return {
+      opponentElo,
+      undosAllowed,
+      undosRemaining,
+      undosUsed,
+      isFinalized,
+    };
+  }
+
+  // Backwards-compatible rescue for previously saved Rated Journey sessions
+  const legacyLabelValue =
+    fallbackEngineProfile &&
+    typeof fallbackEngineProfile === 'object' &&
+    'label' in fallbackEngineProfile
+      ? (fallbackEngineProfile as unknown as { label?: unknown }).label
+      : undefined;
+  const legacyLabel =
+    typeof legacyLabelValue === 'string' ? legacyLabelValue : '';
+  const isLegacyRatedLabel = legacyLabel.startsWith('Rated Challenger');
+  const isLegacyRatedTitle =
+    typeof fallbackTitle === 'string' && fallbackTitle.startsWith('Rated vs. AI ');
+
+  if (isLegacyRatedLabel || isLegacyRatedTitle) {
+    const elo = Math.max(
+      400,
+      Math.min(3000, Math.round(fallbackEngineProfile?.elo ?? 600))
+    );
+    const inferredAllowed = elo < 900 ? 3 : elo < 1250 ? 2 : elo < 1600 ? 1 : 0;
+    return {
+      opponentElo: elo,
+      undosAllowed: inferredAllowed,
+      undosRemaining: inferredAllowed,
+      undosUsed: 0,
+      isFinalized: fallbackStatus !== undefined && fallbackStatus !== 'playing',
+    };
+  }
+
+  return undefined;
 }
 
 /**
@@ -177,14 +264,29 @@ export function deserializeSession(raw: string): StoredGameSession | null {
       ? parsed.fen
       : gameStateToFen(latest);
 
+    const ratedJourney = normalizeRatedSessionMetadata(
+      (parsed as Partial<StoredGameSession>).ratedJourney,
+      parsed.engineProfile,
+      parsed.title,
+      latest.status
+    );
+
     return {
       id: parsed.id,
       title: parsed.title || 'Saved Game',
       createdAt: Number(parsed.createdAt) || Date.now(),
       updatedAt: Number(parsed.updatedAt) || Date.now(),
-      gameMode: parsed.gameMode === 'pass_and_play' ? 'pass_and_play' : 'ai',
+      gameMode: ratedJourney
+        ? 'ai'
+        : parsed.gameMode === 'pass_and_play'
+        ? 'pass_and_play'
+        : 'ai',
       playerColor: parsed.playerColor === 'b' ? 'b' : 'w',
       isFlipped: Boolean(parsed.isFlipped),
+      boardRotation: normalizeBoardRotation(
+        (parsed as Partial<StoredGameSession>).boardRotation,
+        parsed.isFlipped ? 180 : 0
+      ),
       engineProfile: parsed.engineProfile,
       stateStack,
       fen,
@@ -197,6 +299,7 @@ export function deserializeSession(raw: string): StoredGameSession | null {
         ? latest.moveHistory[latest.moveHistory.length - 1].san
         : null,
       isAutoSave: Boolean(parsed.isAutoSave),
+      ratedJourney,
     };
   } catch {
     return null;
@@ -211,31 +314,43 @@ export function createStoredSession(params: {
   gameMode: GameMode;
   playerColor: Color;
   isFlipped: boolean;
+  boardRotation?: BoardRotation;
   engineProfile: EngineProfileState;
   customTitle?: string;
   isAutoSave?: boolean;
   existingId?: string;
+  ratedJourney?: RatedSessionMetadata;
 }): StoredGameSession {
   const {
     stateStack,
     gameMode,
     playerColor,
     isFlipped,
+    boardRotation,
     engineProfile,
     customTitle,
     isAutoSave = false,
     existingId,
+    ratedJourney,
   } = params;
+
+  const resolvedRotation = normalizeBoardRotation(
+    boardRotation,
+    isFlipped ? 180 : 0
+  );
 
   const validStack = stateStack.length > 0 ? stateStack : [createInitialGameState()];
   const latest = validStack[validStack.length - 1];
   const fen = gameStateToFen(latest);
   const now = Date.now();
   const id = existingId ?? `session_${now}_${Math.random().toString(36).slice(2, 7)}`;
+  const normalizedRated = ratedJourney
+    ? normalizeRatedSessionMetadata(ratedJourney, engineProfile, customTitle, latest.status)
+    : undefined;
   const title =
     customTitle && customTitle.trim().length > 0
       ? customTitle.trim()
-      : generateSessionTitle(latest, gameMode, playerColor, engineProfile);
+      : generateSessionTitle(latest, gameMode, playerColor, engineProfile, normalizedRated);
 
   const lastMoveSan =
     latest.moveHistory.length > 0
@@ -247,9 +362,10 @@ export function createStoredSession(params: {
     title,
     createdAt: now,
     updatedAt: now,
-    gameMode,
+    gameMode: normalizedRated ? 'ai' : gameMode,
     playerColor,
-    isFlipped,
+    isFlipped: resolvedRotation === 180,
+    boardRotation: resolvedRotation,
     engineProfile,
     stateStack: validStack,
     fen,
@@ -260,6 +376,7 @@ export function createStoredSession(params: {
     winner: latest.winner,
     lastMoveSan,
     isAutoSave,
+    ...(normalizedRated ? { ratedJourney: normalizedRated } : {}),
   };
 }
 

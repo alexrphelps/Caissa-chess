@@ -1585,12 +1585,14 @@ export function searchBestAIMove(
     state.moveHistory.length > 0 ||
     candidateMoves.length === 20; // 20 legal moves on standard initial board
 
-  if (!state.inCheck && state.moveHistory.length <= 12 && isStartGame) {
+  const maxBookPlies = config.errorProbability >= 0.2 ? 6 : 12;
+
+  if (!state.inCheck && state.moveHistory.length <= maxBookPlies && isStartGame) {
     const bookCandidates = getBookMoveCandidates(state, candidateMoves);
     if (bookCandidates.length > 0) {
       const useBook =
-        difficulty === 'novice'
-          ? rng() >= config.errorProbability
+        config.errorProbability > 0
+          ? rng() >= Math.min(0.85, config.errorProbability * 1.25)
           : true;
 
       if (useBook) {

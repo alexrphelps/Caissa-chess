@@ -1211,12 +1211,14 @@ export class FastSearchEngine {
       rng() < cfg.errorProbability
     ) {
       const margin = cfg.errorMarginCentipawns;
-      const temp = Math.max(15, options.softmaxTemp ?? margin * 0.45);
+      const temp = Math.max(25, options.softmaxTemp ?? margin * 0.65);
       const weightsArr: number[] = [];
       const candIndices: number[] = [];
       let sumW = 0;
-      const capN = Math.min(moveCount, 6);
-      for (let i = 0; i < capN; i++) {
+      const capN = Math.min(moveCount, 8);
+      // Start at i = 1 so a triggered error actually selects a suboptimal human inaccuracy
+      // within `margin` instead of self-canceling back to the engine's #1 best move.
+      for (let i = 1; i < capN; i++) {
         const diff = topScore - moveScores[i];
         if (diff <= margin) {
           const w = Math.exp(-diff / temp);
@@ -1225,8 +1227,9 @@ export class FastSearchEngine {
           sumW += w;
         }
       }
-      if (candIndices.length > 1 && sumW > 0) {
+      if (candIndices.length >= 1 && sumW > 0) {
         let r = rng() * sumW;
+        chosenIdx = candIndices[candIndices.length - 1];
         for (let i = 0; i < candIndices.length; i++) {
           r -= weightsArr[i];
           if (r <= 0) {

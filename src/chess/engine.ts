@@ -1,5 +1,6 @@
 import {
   Board,
+  BoardRotation,
   CastlingRights,
   Color,
   Coords,
@@ -1097,21 +1098,39 @@ export function togglePlannedArrow(
 
 /**
  * Computes the visual square offset (dCol, dRow) from `from` to `to`
- * so a piece on `to` can animate smoothly from its origin square.
+ * so a piece on `to` can animate smoothly from its origin square at any 90° board angle.
  */
 export function computeSlideOffset(
   from: Square,
   to: Square,
-  isFlipped: boolean
+  orientation: boolean | BoardRotation
 ): { dCol: number; dRow: number } {
   if (!isValidSquare(from) || !isValidSquare(to)) {
     return { dCol: 0, dRow: 0 };
   }
   const fromCoords = squareToCoords(from);
   const toCoords = squareToCoords(to);
-  const sign = isFlipped ? -1 : 1;
-  const rawCol = (fromCoords.col - toCoords.col) * sign;
-  const rawRow = (fromCoords.row - toCoords.row) * sign;
+  const rotation: BoardRotation =
+    typeof orientation === 'boolean' ? (orientation ? 180 : 0) : orientation;
+
+  const toVisual = (r: number, c: number) => {
+    switch (rotation) {
+      case 90:
+        return { vr: c, vc: 7 - r };
+      case 180:
+        return { vr: 7 - r, vc: 7 - c };
+      case 270:
+        return { vr: 7 - c, vc: r };
+      case 0:
+      default:
+        return { vr: r, vc: c };
+    }
+  };
+
+  const fromV = toVisual(fromCoords.row, fromCoords.col);
+  const toV = toVisual(toCoords.row, toCoords.col);
+  const rawCol = fromV.vc - toV.vc;
+  const rawRow = fromV.vr - toV.vr;
   return {
     dCol: rawCol === 0 ? 0 : rawCol,
     dRow: rawRow === 0 ? 0 : rawRow,

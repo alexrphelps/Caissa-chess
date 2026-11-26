@@ -15,11 +15,21 @@ import { ReplayPlyCoachInsight, TimelineNode } from './pgnTypes';
 import { analyzeReplayPly } from './replayCoach';
 import { analyzeTacticsDeep, TacticsAnalysis } from './tacticsHelper';
 import {
+  calibrateFromSavedSessions,
+  SavedGamesCalibrationProgress,
+  SavedGamesCalibrationResult,
+  ScoredPlayerPly,
+  scoreMissingPlayerPlies,
+  scoreSinglePlayerPly,
+} from './ratedJourney';
+import {
   AIDifficulty,
   AISearchResult,
   ChessEngineConfig,
   CoachPlaystyleProfile,
+  Color,
   GameState,
+  StoredGameSession,
 } from './types';
 
 export type AIWorkerRequest =
@@ -72,6 +82,26 @@ export type AIWorkerRequest =
       type: 'stop';
     }
   | {
+      type: 'score_rated_ply';
+      requestId: number;
+      stateBefore: GameState;
+      stateAfter: GameState;
+      plyIndex: number;
+    }
+  | {
+      type: 'score_remaining_rated_plies';
+      requestId: number;
+      stateStack: GameState[];
+      playerColor: Color;
+      existingScores: Record<number, ScoredPlayerPly>;
+    }
+  | {
+      type: 'calibrate_saved_games';
+      requestId: number;
+      sessions: StoredGameSession[];
+      puzzleRatingPrior?: number | null;
+    }
+  | {
       type: 'clear_hash';
     };
 
@@ -105,6 +135,32 @@ export type AIWorkerResponse =
       type: 'info';
       requestId: number;
       info: SearchInfoEvent;
+    }
+  | {
+      type: 'score_rated_ply';
+      requestId: number;
+      scoredPly: ScoredPlayerPly;
+    }
+  | {
+      type: 'score_remaining_rated_plies_progress';
+      requestId: number;
+      completed: number;
+      total: number;
+    }
+  | {
+      type: 'score_remaining_rated_plies';
+      requestId: number;
+      scoredPlies: ScoredPlayerPly[];
+    }
+  | {
+      type: 'calibrate_saved_games_progress';
+      requestId: number;
+      progress: SavedGamesCalibrationProgress;
+    }
+  | {
+      type: 'calibrate_saved_games';
+      requestId: number;
+      result: SavedGamesCalibrationResult;
     }
   | {
       type: 'bestmove';
@@ -251,6 +307,62 @@ ctx.onmessage = (event: MessageEvent<AIWorkerRequest>) => {
       report,
     };
     ctx.postMessage(response);
+    return;
+  }
+
+  if (data.type === 'score_rated_ply') {
+    const scoredPly = scoreSinglePlayerPly(
+      data.stateBefore,
+      data.stateAfter,
+      data.plyIndex
+    );
+    ctx.postMessage({
+      type: 'score_rated_ply',
+      requestId: data.requestId,
+      scoredPly,
+    });
+    return;
+  }
+
+  if (data.type === 'score_remaining_rated_plies') {
+    const scoredPlies = scoreMissingPlayerPlies(
+      data.stateStack,
+      data.playerColor,
+      data.existingScores,
+      (completed, total) => {
+        ctx.postMessage({
+          type: 'score_remaining_rated_plies_progress',
+          requestId: data.requestId,
+          completed,
+          total,
+        });
+      }
+    );
+    ctx.postMessage({
+      type: 'score_remaining_rated_plies',
+      requestId: data.requestId,
+      scoredPlies,
+    });
+    return;
+  }
+
+  if (data.type === 'calibrate_saved_games') {
+    const result = calibrateFromSavedSessions(
+      data.sessions,
+      data.puzzleRatingPrior,
+      (progress) => {
+        ctx.postMessage({
+          type: 'calibrate_saved_games_progress',
+          requestId: data.requestId,
+          progress,
+        });
+      }
+    );
+    ctx.postMessage({
+      type: 'calibrate_saved_games',
+      requestId: data.requestId,
+      result,
+    });
     return;
   }
 

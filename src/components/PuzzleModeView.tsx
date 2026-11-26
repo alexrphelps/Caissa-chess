@@ -36,7 +36,20 @@ import {
   RatingBand,
   RATING_BANDS,
 } from '../chess/puzzles/types';
-import { Color, GameState, Move, PlannedArrow, PromotionPieceType, Square } from '../chess/types';
+import {
+  BoardRotation,
+  Color,
+  GameState,
+  Move,
+  PlannedArrow,
+  PromotionPieceType,
+  Square,
+} from '../chess/types';
+import {
+  flipBoardRotation,
+  rotateBoardCCW,
+  rotateBoardCW,
+} from '../utils/boardOrientation';
 import { soundFX } from '../utils/sound';
 import {
   computeBoardGridSize,
@@ -223,7 +236,8 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
     from: Square;
     to: Square;
   } | null>(null);
-  const [isFlipped, setIsFlipped] = useState<boolean>(false);
+  const [boardRotation, setBoardRotation] = useState<BoardRotation>(0);
+  const isFlipped = boardRotation === 180;
 
   // Feedback animations
   const [shakeBoard, setShakeBoard] = useState<boolean>(false);
@@ -320,7 +334,7 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
 
       // Auto perspective: orient board to player's side
       const playerSide = oppositeColor(root.turn);
-      setIsFlipped(playerSide === 'b');
+      setBoardRotation(playerSide === 'b' ? 180 : 0);
 
       // Animate opponent setup blunder moves[0] after brief delay
       setStepStatus('playing_setup');
@@ -372,7 +386,7 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
       setCurrentMoveIndex(0);
 
       const playerSide = oppositeColor(root.turn);
-      setIsFlipped(playerSide === 'b');
+      setBoardRotation(playerSide === 'b' ? 180 : 0);
 
       setStepStatus('playing_setup');
       setupMoveTimerRef.current = window.setTimeout(() => {
@@ -855,7 +869,11 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
         e.preventDefault();
         handleResetPuzzle();
       } else if (e.key === 'f' || e.key === 'F') {
-        setIsFlipped((prev) => !prev);
+        setBoardRotation((prev) => flipBoardRotation(prev));
+      } else if (e.key === 't' || e.key === 'T') {
+        setBoardRotation((prev) =>
+          e.shiftKey ? rotateBoardCCW(prev) : rotateBoardCW(prev)
+        );
       } else if (e.key === 'm' || e.key === 'M') {
         onToggleMute();
       } else if (e.key === 'Escape') {
@@ -1091,6 +1109,7 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
               selectedSquare={selectedSquare}
               pendingPromotion={pendingPromotion}
               isFlipped={isFlipped}
+              boardRotation={boardRotation}
               isInteractionDisabled={stepStatus !== 'player_turn'}
               helperMode={false}
               showBoardSuggestions={false}
@@ -1150,7 +1169,17 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setIsFlipped((prev) => !prev)}
+                data-testid="puzzle-underboard-rotate-button"
+                onClick={() => setBoardRotation((prev) => rotateBoardCW(prev))}
+                className="hover:text-[#F4EFE6] underline underline-offset-2 cursor-pointer"
+              >
+                Rotate 90° ({boardRotation}°) [T]
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setBoardRotation((prev) => flipBoardRotation(prev))
+                }
                 className="hover:text-[#F4EFE6] underline underline-offset-2 cursor-pointer"
               >
                 Flip [F]

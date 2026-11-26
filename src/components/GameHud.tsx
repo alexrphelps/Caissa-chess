@@ -27,6 +27,7 @@ import {
   AIDifficulty,
   AIPresetId,
   AISearchResult,
+  BoardRotation,
   CoachPlaystyleKnobs,
   CoachPlaystylePresetId,
   CoachPlaystyleProfile,
@@ -37,6 +38,11 @@ import {
   MoveRecord,
   PieceType,
 } from '../chess/types';
+import {
+  BOARD_ROTATIONS,
+  describeBoardRotation,
+  resolveBoardRotation,
+} from '../utils/boardOrientation';
 import { ChessPieceSvg, PIECE_NAMES } from './ChessPieceSvg';
 import { OpeningPrinciplesHud } from './OpeningPrinciplesHud';
 
@@ -49,6 +55,7 @@ export interface SharedHudProps {
   lastSearchStats: AISearchResult | null;
   showEngineStats: boolean;
   isFlipped: boolean;
+  boardRotation?: BoardRotation;
   isAIThinking: boolean;
   canUndo: boolean;
   isMuted: boolean;
@@ -71,10 +78,14 @@ export interface SharedHudProps {
   onPlayRecommendedMove: (rec: RecommendedMove) => void;
   onNewGame: () => void;
   onFlipBoard: () => void;
+  onRotateBoardCW?: () => void;
+  onRotateBoardCCW?: () => void;
+  onSetBoardRotation?: (rotation: BoardRotation) => void;
   onTogglePlayAsColor: (color: Color) => void;
   onToggleGameMode: (mode: GameMode) => void;
   onUndoMove: () => void;
   onOpenPause: () => void;
+  onReturnToTitle?: () => void;
   onToggleMute: () => void;
   onOpenSavedGames?: () => void;
   onSaveCurrentSession?: () => void;
@@ -89,6 +100,16 @@ export interface SharedHudProps {
   onOpenBoardCustomizer?: () => void;
   isCoachPanelOpen?: boolean;
   onToggleCoachPanel?: () => void;
+  ratedJourneyContext?: {
+    playerRating: number;
+    playerRd: number;
+    opponentElo: number;
+    undosRemaining: number;
+    undosAllowed: number;
+    tierName: string;
+    onResignMatch: () => void;
+    onOpenJourneyHub: () => void;
+  } | null;
 }
 
 export function getStatusBannerText(
@@ -288,6 +309,7 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
   lastSearchStats,
   showEngineStats,
   isFlipped,
+  boardRotation,
   isAIThinking,
   canUndo,
   isMuted,
@@ -304,10 +326,14 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
   onToggleBoardSuggestions,
   onNewGame,
   onFlipBoard,
+  onRotateBoardCW,
+  onRotateBoardCCW,
+  onSetBoardRotation,
   onTogglePlayAsColor,
   onToggleGameMode,
   onUndoMove,
   onOpenPause,
+  onReturnToTitle,
   onToggleMute,
   onOpenSavedGames,
   onSaveCurrentSession,
@@ -322,10 +348,12 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
   onOpenBoardCustomizer,
   isCoachPanelOpen = true,
   onToggleCoachPanel,
+  ratedJourneyContext = null,
 }) => {
   const [openPopover, setOpenPopover] = useState<'history' | 'options' | null>(
     null
   );
+  const [confirmingResign, setConfirmingResign] = useState(false);
   const popoverContainerRef = useRef<HTMLDivElement | null>(null);
   const moveListRef = useRef<HTMLDivElement | null>(null);
 
@@ -336,6 +364,7 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
     }
   };
 
+  const activeRotation = resolveBoardRotation(boardRotation, isFlipped);
   const activeDiffInfo = getDifficultyInfo(aiDifficulty);
   const profileSummary = engineProfile
     ? describeEngineProfileSummary(engineProfile)
@@ -450,27 +479,42 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
       className="w-full shrink-0 bg-[#151E19] border-b border-[#293830] px-3 sm:px-5 py-2 z-30"
     >
       <div className="w-full max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-2">
-        {/* Zone 1: Brand Identity */}
-        <div className="min-w-[118px] max-w-[152px] flex items-center shrink-0 overflow-hidden">
-          <div className="min-w-0 w-full">
-            <h1
-              className="text-sm sm:text-base font-bold tracking-tight text-[#F4EFE6] leading-tight whitespace-nowrap truncate"
-              style={{ fontFamily: 'var(--font-display)' }}
+        {/* Zone 1: Main Menu Return + Brand Identity */}
+        <div className="flex items-center gap-2 shrink-0 min-w-0">
+          {onReturnToTitle && (
+            <button
+              type="button"
+              data-testid="hud-main-menu-btn"
+              onClick={onReturnToTitle}
+              title="Return to Main Menu"
+              aria-label="Return to Main Menu"
+              className="h-[38px] px-2.5 rounded-xl border border-[#34463C] bg-[#1C2822] hover:bg-[#26362E] hover:border-[#C6923A]/70 text-xs font-semibold text-[#EADBC8] hover:text-[#F4EFE6] flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
-              CAÏSSA CHESS
-            </h1>
-            <p
-              data-testid="header-engine-profile-summary"
-              className="text-[11px] text-[#A69F91] mt-0.5 whitespace-nowrap truncate"
-            >
-              {gameMode === 'ai'
-                ? profileSummary && engineProfile
-                  ? `${profileSummary.title} · ${engineProfile.config.maxDepth}p${
-                      engineProfile.config.enableQuiescence ? '+Q' : ''
-                    }`
-                  : `${activeDiffInfo.name} · ${activeDiffInfo.depthLabel}`
-                : '2-Player Pass & Play'}
-            </p>
+              <span aria-hidden="true">←</span>
+              <span>Menu</span>
+            </button>
+          )}
+          <div className="min-w-[108px] max-w-[144px] flex items-center shrink-0 overflow-hidden">
+            <div className="min-w-0 w-full">
+              <h1
+                className="text-sm sm:text-base font-bold tracking-tight text-[#F4EFE6] leading-tight whitespace-nowrap truncate"
+                style={{ fontFamily: 'var(--font-display)' }}
+              >
+                CAÏSSA CHESS
+              </h1>
+              <p
+                data-testid="header-engine-profile-summary"
+                className="text-[11px] text-[#A69F91] mt-0.5 whitespace-nowrap truncate"
+              >
+                {gameMode === 'ai'
+                  ? profileSummary && engineProfile
+                    ? `${profileSummary.title} · ${engineProfile.config.maxDepth}p${
+                        engineProfile.config.enableQuiescence ? '+Q' : ''
+                      }`
+                    : `${activeDiffInfo.name} · ${activeDiffInfo.depthLabel}`
+                  : '2-Player Pass & Play'}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -510,8 +554,37 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
           </div>
         </div>
 
-        {/* Zone 3: AI Difficulty, Reactive Preset, Customizer Button & Telemetry Strip */}
-        {gameMode === 'ai' && (
+        {/* Zone 3: Rated Journey Readout OR AI Difficulty, Reactive Preset, Customizer Button & Telemetry Strip */}
+        {ratedJourneyContext ? (
+          <div
+            data-testid="hud-rated-journey-bar"
+            className="flex items-center gap-2.5 h-[44px] bg-[#14201A] border border-[#345040] rounded-xl px-3 shrink-0"
+          >
+            <button
+              type="button"
+              data-testid="hud-journey-hub-btn"
+              onClick={ratedJourneyContext.onOpenJourneyHub}
+              title="Open Rated Journey Hub"
+              className="flex items-center gap-2 text-xs font-mono tabular-nums text-[#F4EFE6] hover:text-[#4ADE80] transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <span className="font-bold text-[#4ADE80]">Rated</span>
+              <span className="text-[#4B6356]" aria-hidden="true">·</span>
+              <span>
+                You <strong className="text-[#F4EFE6]">{ratedJourneyContext.playerRating}</strong>
+                <span className="hidden 2xl:inline text-[#8E8779]">
+                  {' '}±{ratedJourneyContext.playerRd}
+                </span>
+              </span>
+              <span className="text-[#4B6356]" aria-hidden="true">vs</span>
+              <span className="text-[#C6923A] font-bold">
+                AI {ratedJourneyContext.opponentElo}
+              </span>
+            </button>
+            <span className="hidden lg:inline text-[11px] font-mono text-[#8E8779] border-l border-[#26362E] pl-2.5 whitespace-nowrap">
+              Coach Locked
+            </span>
+          </div>
+        ) : gameMode === 'ai' && (
           <div
             data-testid="hud-difficulty-panel"
             className="hidden xl:flex items-center justify-between gap-2 h-[44px] bg-[#121A16] border border-[#26342C] rounded-xl px-2.5 py-1.5 shrink-0"
@@ -660,19 +733,27 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
             </svg>
           </button>
 
-          {/* Quick Action: Undo Move */}
+          {/* Quick Action: Undo Move (with Rated Journey budget counter when active) */}
           <button
             type="button"
             data-testid="quick-undo-button"
-            disabled={!canUndo}
+            disabled={
+              !canUndo ||
+              (ratedJourneyContext !== null &&
+                ratedJourneyContext.undosRemaining <= 0)
+            }
             onClick={onUndoMove}
             title={
-              isAIThinking && canUndo
+              ratedJourneyContext
+                ? ratedJourneyContext.undosRemaining > 0
+                  ? `Undo Move (${ratedJourneyContext.undosRemaining} of ${ratedJourneyContext.undosAllowed} left) [U]`
+                  : 'No Undos remaining in this Rated Match'
+                : isAIThinking && canUndo
                 ? 'Undo Move (Cancels AI thinking) [U]'
                 : 'Undo Move [U]'
             }
             className={`h-[44px] px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-              isAIThinking && canUndo
+              isAIThinking && canUndo && (!ratedJourneyContext || ratedJourneyContext.undosRemaining > 0)
                 ? 'bg-[#2A2318] hover:bg-[#3B2F1F] border-[#C6923A]/80 text-[#F4EFE6] shadow-[0_0_8px_rgba(198,146,58,0.25)]'
                 : 'bg-[#212E27] hover:bg-[#2C3D34] disabled:opacity-40 disabled:pointer-events-none border-[#34463C] text-[#F4EFE6]'
             }`}
@@ -695,8 +776,49 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                 strokeLinejoin="round"
               />
             </svg>
-            <span>Undo</span>
+            <span className="tabular-nums">
+              {ratedJourneyContext
+                ? `Undo (${ratedJourneyContext.undosRemaining}/${ratedJourneyContext.undosAllowed})`
+                : 'Undo'}
+            </span>
           </button>
+
+          {/* Rated Journey Inline Two-Step Resign Control */}
+          {ratedJourneyContext && gameState.status === 'playing' && (
+            !confirmingResign ? (
+              <button
+                type="button"
+                data-testid="rated-resign-btn"
+                onClick={() => setConfirmingResign(true)}
+                title="Resign Rated Match"
+                className="h-[44px] px-3 rounded-xl border bg-[#24191A] hover:bg-[#342022] border-[#5B2B2E] text-xs font-semibold text-[#FCA5A5] transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              >
+                Resign
+              </button>
+            ) : (
+              <div className="h-[44px] px-2 rounded-xl border border-[#EF4444]/70 bg-[#2A1516] flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  data-testid="rated-resign-confirm-btn"
+                  onClick={() => {
+                    setConfirmingResign(false);
+                    ratedJourneyContext.onResignMatch();
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#B91C1C] hover:bg-[#DC2626] text-[11px] font-bold text-[#FEF2F2] cursor-pointer whitespace-nowrap"
+                >
+                  Confirm Resign
+                </button>
+                <button
+                  type="button"
+                  data-testid="rated-resign-cancel-btn"
+                  onClick={() => setConfirmingResign(false)}
+                  className="px-2 py-1.5 rounded-lg bg-[#1F2C25] hover:bg-[#2B3D34] text-[11px] font-medium text-[#D6CFC2] cursor-pointer whitespace-nowrap"
+                >
+                  Cancel
+                </button>
+              </div>
+            )
+          )}
 
           {/* Quick Action: Return to Original Replay (when branched from a PGN replay) */}
           {replayBranchLabel && onReturnToOriginalReplay && (
@@ -759,8 +881,8 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
             </button>
           )}
 
-          {/* Restore Tactical Coach Panel Pill when Hidden (Zen Board Mode) */}
-          {!isCoachPanelOpen && onToggleCoachPanel && (
+          {/* Restore Tactical Coach Panel Pill when Hidden (Zen Board Mode, disabled during Rated Journey) */}
+          {!ratedJourneyContext && !isCoachPanelOpen && onToggleCoachPanel && (
             <button
               type="button"
               data-testid="hud-restore-coach-btn"
@@ -1000,8 +1122,8 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                 </span>
               </div>
 
-              {/* Section 0: AI Engine Strength & Customizer (when vs. AI) */}
-              {gameMode === 'ai' && engineProfile && (
+              {/* Section 0: AI Engine Strength & Customizer (when vs. AI, hidden during Rated Journey) */}
+              {!ratedJourneyContext && gameMode === 'ai' && engineProfile && (
                 <div className="p-2.5 rounded-lg bg-[#121A16] border border-[#26342C] space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-mono uppercase tracking-wider text-[#A69F91]">
@@ -1039,6 +1161,17 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                       </span>
                     </button>
                   )}
+                </div>
+              )}
+              {ratedJourneyContext && (
+                <div className="p-2.5 rounded-lg bg-[#13201A] border border-[#2F4A3B] space-y-1">
+                  <div className="text-[11px] font-mono font-bold text-[#4ADE80]">
+                    Rated Journey Guardrails Active
+                  </div>
+                  <div className="text-[11px] text-[#A69F91] leading-snug">
+                    Opponent Elo ({ratedJourneyContext.opponentElo}), live Coach
+                    hints, and Eval Bar are locked to preserve rating accuracy.
+                  </div>
                 </div>
               )}
 
@@ -1118,7 +1251,8 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                   </button>
                 )}
 
-                {onOpenGameReview && (
+                {onOpenGameReview &&
+                  !(ratedJourneyContext && gameState.status === 'playing') && (
                   <button
                     type="button"
                     data-testid="options-game-review-btn"
@@ -1178,55 +1312,131 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    onFlipBoard();
-                    setOpenPopover(null);
-                  }}
-                  className="w-full h-8 px-3 rounded-lg bg-[#212E27] hover:bg-[#2B3B32] border border-[#34463C] text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
-                >
-                  <span>
-                    Flip Board ({isFlipped ? 'Black Bottom' : 'White Bottom'})
-                  </span>
-                  <span className="text-[10px] font-mono text-[#A69F91]">
-                    [F]
-                  </span>
-                </button>
+                {/* Board Rotation & Perspective Controls */}
+                <div className="p-2 rounded-lg bg-[#121A16] border border-[#26342C] space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-mono font-semibold text-[#EADBC8]">
+                      Board Angle
+                    </span>
+                    <span className="text-[11px] font-mono text-[#C6923A] tabular-nums">
+                      {activeRotation}° · {describeBoardRotation(activeRotation)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {BOARD_ROTATIONS.map((deg) => {
+                      const isActive = activeRotation === deg;
+                      return (
+                        <button
+                          key={deg}
+                          type="button"
+                          data-testid={`options-rotate-${deg}`}
+                          aria-pressed={isActive}
+                          onClick={() => onSetBoardRotation?.(deg)}
+                          className={`h-7 rounded text-[11px] font-mono font-bold border transition-colors cursor-pointer tabular-nums ${
+                            isActive
+                              ? 'bg-[#C6923A] border-[#C6923A] text-[#111815]'
+                              : 'bg-[#1C2822] hover:bg-[#27362E] border-[#34463C] text-[#D6CFC2]'
+                          }`}
+                        >
+                          {deg}°
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      data-testid="options-rotate-cw-btn"
+                      onClick={() => onRotateBoardCW?.()}
+                      className="h-7 px-2 rounded bg-[#212E27] hover:bg-[#2B3B32] border border-[#34463C] text-[11px] font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <span>Rotate +90°</span>
+                      <span className="text-[10px] font-mono text-[#A69F91]">
+                        [T]
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="options-flip-board-btn"
+                      onClick={() => {
+                        onFlipBoard();
+                      }}
+                      className="h-7 px-2 rounded bg-[#212E27] hover:bg-[#2B3B32] border border-[#34463C] text-[11px] font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <span>Flip 180°</span>
+                      <span className="text-[10px] font-mono text-[#A69F91]">
+                        [F]
+                      </span>
+                    </button>
+                  </div>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    onTogglePlayAsColor(playerColor === 'w' ? 'b' : 'w');
-                    setOpenPopover(null);
-                  }}
-                  className="w-full h-8 px-3 rounded-lg bg-[#212E27] hover:bg-[#2B3B32] border border-[#34463C] text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
-                >
-                  <span>
-                    {playerColor === 'w' ? 'Play as Black' : 'Play as White'}
-                  </span>
-                  <span className="text-[10px] font-mono text-[#C6923A]">
-                    New Match
-                  </span>
-                </button>
+                {!ratedJourneyContext && (
+                  <>
+                    <div className="p-2 rounded-lg bg-[#121A16] border border-[#26342C] space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono font-semibold text-[#EADBC8]">
+                          Play Side
+                        </span>
+                        <span className="text-[10px] font-mono text-[#A69F91]">
+                          Starts new match
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          data-testid="options-play-white-btn"
+                          aria-pressed={playerColor === 'w'}
+                          onClick={() => {
+                            onTogglePlayAsColor('w');
+                            setOpenPopover(null);
+                          }}
+                          className={`h-7 px-2 rounded text-xs font-semibold border transition-colors cursor-pointer ${
+                            playerColor === 'w'
+                              ? 'bg-[#EADBC8] border-[#C6923A] text-[#111815] font-bold'
+                              : 'bg-[#1C2822] hover:bg-[#27362E] border-[#34463C] text-[#D6CFC2]'
+                          }`}
+                        >
+                          Play White
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="options-play-black-btn"
+                          aria-pressed={playerColor === 'b'}
+                          onClick={() => {
+                            onTogglePlayAsColor('b');
+                            setOpenPopover(null);
+                          }}
+                          className={`h-7 px-2 rounded text-xs font-semibold border transition-colors cursor-pointer ${
+                            playerColor === 'b'
+                              ? 'bg-[#C6923A] border-[#C6923A] text-[#111815] font-bold'
+                              : 'bg-[#1C2822] hover:bg-[#27362E] border-[#34463C] text-[#D6CFC2]'
+                          }`}
+                        >
+                          Play Black
+                        </button>
+                      </div>
+                    </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    onToggleGameMode(
-                      gameMode === 'ai' ? 'pass_and_play' : 'ai'
-                    );
-                    setOpenPopover(null);
-                  }}
-                  className="w-full h-8 px-3 rounded-lg bg-[#212E27] hover:bg-[#2B3B32] border border-[#34463C] text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
-                >
-                  <span>
-                    {gameMode === 'ai' ? 'Mode: vs. AI' : 'Mode: 2-Player'}
-                  </span>
-                  <span className="text-[10px] font-mono text-[#A69F91]">
-                    Switch
-                  </span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleGameMode(
+                          gameMode === 'ai' ? 'pass_and_play' : 'ai'
+                        );
+                        setOpenPopover(null);
+                      }}
+                      className="w-full h-8 px-3 rounded-lg bg-[#212E27] hover:bg-[#2B3B32] border border-[#34463C] text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <span>
+                        {gameMode === 'ai' ? 'Mode: vs. AI' : 'Mode: 2-Player'}
+                      </span>
+                      <span className="text-[10px] font-mono text-[#A69F91]">
+                        Switch
+                      </span>
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Section 2: Coach & Telemetry Toggles */}
@@ -1234,54 +1444,82 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                 <button
                   type="button"
                   role="switch"
-                  aria-checked={helperMode}
+                  aria-checked={ratedJourneyContext ? false : helperMode}
+                  disabled={Boolean(ratedJourneyContext)}
                   onClick={onToggleHelperMode}
-                  className="w-full h-8 px-3 rounded-lg bg-[#1C2822] hover:bg-[#25352C] border border-[#34463C] text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
-                >
-                  <span>Helper Mode: {helperMode ? 'ON' : 'OFF'}</span>
-                  <span
-                    className={`text-[10px] font-mono font-bold ${
-                      helperMode ? 'text-[#4ADE80]' : 'text-[#A69F91]'
-                    }`}
-                  >
-                    [H]
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={showBoardSuggestions}
-                  onClick={onToggleBoardSuggestions}
-                  className="w-full h-8 px-3 rounded-lg bg-[#1C2822] hover:bg-[#25352C] border border-[#34463C] text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
+                  className="w-full h-8 px-3 rounded-lg bg-[#1C2822] hover:bg-[#25352C] disabled:opacity-45 disabled:pointer-events-none border border-[#34463C] text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
                 >
                   <span>
-                    Board Suggestions: {showBoardSuggestions ? 'ON' : 'OFF'}
+                    Helper Mode:{' '}
+                    {ratedJourneyContext ? 'LOCKED' : helperMode ? 'ON' : 'OFF'}
                   </span>
                   <span
                     className={`text-[10px] font-mono font-bold ${
-                      showBoardSuggestions ? 'text-[#C6923A]' : 'text-[#A69F91]'
+                      !ratedJourneyContext && helperMode
+                        ? 'text-[#4ADE80]'
+                        : 'text-[#A69F91]'
                     }`}
                   >
-                    [B]
+                    {ratedJourneyContext ? 'Rated' : '[H]'}
                   </span>
                 </button>
 
                 <button
                   type="button"
                   role="switch"
-                  aria-checked={showEngineStats}
-                  data-testid="engine-stats-toggle"
-                  onClick={onToggleEngineStats}
-                  className="w-full h-8 px-3 rounded-lg bg-[#1C2822] hover:bg-[#25352C] border border-[#34463C] text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
+                  aria-checked={ratedJourneyContext ? false : showBoardSuggestions}
+                  disabled={Boolean(ratedJourneyContext)}
+                  onClick={onToggleBoardSuggestions}
+                  className="w-full h-8 px-3 rounded-lg bg-[#1C2822] hover:bg-[#25352C] disabled:opacity-45 disabled:pointer-events-none border border-[#34463C] text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
                 >
-                  <span>Engine Stats: {showEngineStats ? 'ON' : 'OFF'}</span>
+                  <span>
+                    Board Suggestions:{' '}
+                    {ratedJourneyContext
+                      ? 'LOCKED'
+                      : showBoardSuggestions
+                      ? 'ON'
+                      : 'OFF'}
+                  </span>
                   <span
                     className={`text-[10px] font-mono font-bold ${
-                      showEngineStats ? 'text-[#C6923A]' : 'text-[#A69F91]'
+                      !ratedJourneyContext && showBoardSuggestions
+                        ? 'text-[#C6923A]'
+                        : 'text-[#A69F91]'
                     }`}
                   >
-                    {showEngineStats ? 'Visible' : 'Hidden'}
+                    {ratedJourneyContext ? 'Rated' : '[B]'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={ratedJourneyContext ? false : showEngineStats}
+                  disabled={Boolean(ratedJourneyContext)}
+                  data-testid="engine-stats-toggle"
+                  onClick={onToggleEngineStats}
+                  className="w-full h-8 px-3 rounded-lg bg-[#1C2822] hover:bg-[#25352C] disabled:opacity-45 disabled:pointer-events-none border border-[#34463C] text-xs font-semibold text-[#F4EFE6] flex items-center justify-between transition-colors cursor-pointer"
+                >
+                  <span>
+                    Engine Stats:{' '}
+                    {ratedJourneyContext
+                      ? 'LOCKED'
+                      : showEngineStats
+                      ? 'ON'
+                      : 'OFF'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-mono font-bold ${
+                      !ratedJourneyContext && showEngineStats
+                        ? 'text-[#C6923A]'
+                        : 'text-[#A69F91]'
+                    }`}
+                  >
+                    {ratedJourneyContext
+                      ? 'Rated'
+                      : showEngineStats
+                      ? 'Visible'
+                      : 'Hidden'}
                   </span>
                 </button>
 
@@ -1297,29 +1535,47 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                 </button>
               </div>
 
-              {/* Section 3: Pause & New Game */}
-              <div className="pt-2 border-t border-[#26342C] grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenPopover(null);
-                    onOpenPause();
-                  }}
-                  className="h-8 px-3 rounded-lg bg-[#212E27] hover:bg-[#2C3D34] border border-[#34463C] text-xs font-semibold text-[#D6CFC2] hover:text-[#F4EFE6] transition-colors cursor-pointer"
-                >
-                  Pause [P]
-                </button>
+              {/* Section 3: Pause, New Game & Main Menu */}
+              <div className="pt-2 border-t border-[#26342C] space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenPopover(null);
+                      onOpenPause();
+                    }}
+                    className="h-8 px-3 rounded-lg bg-[#212E27] hover:bg-[#2C3D34] border border-[#34463C] text-xs font-semibold text-[#D6CFC2] hover:text-[#F4EFE6] transition-colors cursor-pointer"
+                  >
+                    Pause [P]
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenPopover(null);
-                    onNewGame();
-                  }}
-                  className="h-8 px-3 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] text-xs font-bold text-[#111815] transition-colors cursor-pointer"
-                >
-                  New Game [R]
-                </button>
+                  <button
+                    type="button"
+                    data-testid="options-new-game-btn"
+                    onClick={() => {
+                      setOpenPopover(null);
+                      onNewGame();
+                    }}
+                    className="h-8 px-3 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] text-xs font-bold text-[#111815] transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    {ratedJourneyContext ? 'Next Rated [R]' : 'New Game [R]'}
+                  </button>
+                </div>
+
+                {onReturnToTitle && (
+                  <button
+                    type="button"
+                    data-testid="options-main-menu-btn"
+                    onClick={() => {
+                      setOpenPopover(null);
+                      onReturnToTitle();
+                    }}
+                    className="w-full h-8 px-3 rounded-lg bg-[#1A241F] hover:bg-[#25352C] border border-[#34463C] text-xs font-semibold text-[#EADBC8] hover:text-[#F4EFE6] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <span aria-hidden="true">←</span>
+                    <span>Return to Main Menu</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1433,10 +1689,14 @@ export interface UnderBoardPlayerStripProps {
   playerColor: Color;
   aiDifficulty: AIDifficulty;
   engineProfile?: EngineProfileState;
+  boardRotation?: BoardRotation;
   previewPly?: number | null;
   totalPlies?: number;
   frameWidthPx?: number;
   onPreviewPly?: (ply: number | null) => void;
+  onRotateBoardCW?: () => void;
+  onRotateBoardCCW?: () => void;
+  onFlipBoard?: () => void;
   onCopyFen?: () => void;
   onCopyPgn?: () => void;
   onOpenGameReview?: () => void;
@@ -1448,10 +1708,14 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
   playerColor,
   aiDifficulty,
   engineProfile,
+  boardRotation = 0,
   previewPly = null,
   totalPlies = 0,
   frameWidthPx,
   onPreviewPly,
+  onRotateBoardCW,
+  onRotateBoardCCW,
+  onFlipBoard,
   onCopyFen,
   onCopyPgn,
   onOpenGameReview,
@@ -1497,6 +1761,54 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
   const canGoBack = currentPly > 0;
   const canGoForward = isScrubbing;
 
+  const isSideways = boardRotation === 90 || boardRotation === 270;
+  const whiteSideHint =
+    boardRotation === 90
+      ? isCompactStrip
+        ? ' · L'
+        : ' · Left'
+      : boardRotation === 270
+      ? isCompactStrip
+        ? ' · R'
+        : ' · Right'
+      : '';
+  const blackSideHint =
+    boardRotation === 90
+      ? isCompactStrip
+        ? ' · R'
+        : ' · Right'
+      : boardRotation === 270
+      ? isCompactStrip
+        ? ' · L'
+        : ' · Left'
+      : '';
+
+  const whiteRack = (
+    <PlayerRackSegment
+      key="rack-w"
+      color="w"
+      label={`${whiteLabel}${whiteSideHint}`}
+      isActiveTurn={gameState.status === 'playing' && gameState.turn === 'w'}
+      isInCheck={gameState.inCheck && gameState.turn === 'w'}
+      capturedPieces={gameState.capturedByWhite}
+      capturedPieceColor="b"
+      materialAdvantage={whiteAdvantage}
+    />
+  );
+
+  const blackRack = (
+    <PlayerRackSegment
+      key="rack-b"
+      color="b"
+      label={`${blackLabel}${blackSideHint}`}
+      isActiveTurn={gameState.status === 'playing' && gameState.turn === 'b'}
+      isInCheck={gameState.inCheck && gameState.turn === 'b'}
+      capturedPieces={gameState.capturedByBlack}
+      capturedPieceColor="w"
+      materialAdvantage={blackAdvantage}
+    />
+  );
+
   return (
     <div
       data-testid="under-board-player-strip"
@@ -1512,29 +1824,17 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
       className="@container/strip w-full flex flex-col gap-2 shrink-0 select-none"
     >
       <div className="w-full grid grid-cols-1 @[340px]/strip:grid-cols-2 gap-2">
-        <PlayerRackSegment
-          color="w"
-          label={whiteLabel}
-          isActiveTurn={
-            gameState.status === 'playing' && gameState.turn === 'w'
-          }
-          isInCheck={gameState.inCheck && gameState.turn === 'w'}
-          capturedPieces={gameState.capturedByWhite}
-          capturedPieceColor="b"
-          materialAdvantage={whiteAdvantage}
-        />
-
-        <PlayerRackSegment
-          color="b"
-          label={blackLabel}
-          isActiveTurn={
-            gameState.status === 'playing' && gameState.turn === 'b'
-          }
-          isInCheck={gameState.inCheck && gameState.turn === 'b'}
-          capturedPieces={gameState.capturedByBlack}
-          capturedPieceColor="w"
-          materialAdvantage={blackAdvantage}
-        />
+        {boardRotation === 270 ? (
+          <>
+            {blackRack}
+            {whiteRack}
+          </>
+        ) : (
+          <>
+            {whiteRack}
+            {blackRack}
+          </>
+        )}
       </div>
 
       {/* Under-Board Move Scrubbing & FEN Export Toolbar */}
@@ -1624,8 +1924,83 @@ export const UnderBoardPlayerStrip: React.FC<UnderBoardPlayerStripProps> = ({
           )}
         </div>
 
-        {/* Action Buttons: FEN, PGN, Review */}
+        {/* Action Buttons: 90° Board Rotation, FEN, PGN, Review */}
         <div className="flex items-center gap-1 shrink-0">
+          {(onRotateBoardCW || onRotateBoardCCW) && (
+            <div
+              role="group"
+              aria-label="Board rotation controls"
+              className="inline-flex items-center rounded bg-[#101713] border border-[#2C3E34] p-0.5 gap-0.5"
+            >
+              {onRotateBoardCCW && (
+                <button
+                  type="button"
+                  data-testid="strip-rotate-ccw-btn"
+                  aria-label="Rotate board 90 degrees counter-clockwise"
+                  title="Rotate Board 90° Left (Shift+T)"
+                  onClick={onRotateBoardCCW}
+                  className="w-6 h-6 rounded flex items-center justify-center bg-[#1C2822] hover:bg-[#283830] text-[#EADBC8] hover:text-[#C6923A] transition-colors cursor-pointer"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                    <path d="M3 3v5h5" />
+                  </svg>
+                </button>
+              )}
+              <button
+                type="button"
+                data-testid="strip-board-angle-btn"
+                aria-label={`Board angle ${boardRotation} degrees (${describeBoardRotation(
+                  boardRotation
+                )}). Click to flip 180 degrees`}
+                title={`Angle: ${boardRotation}° (${describeBoardRotation(
+                  boardRotation
+                )}) · Click to Flip 180° (F)`}
+                onClick={onFlipBoard}
+                className={`h-6 px-1.5 rounded text-[10px] font-mono font-bold tabular-nums transition-colors cursor-pointer whitespace-nowrap ${
+                  isSideways
+                    ? 'bg-[#C6923A]/20 text-[#C6923A] hover:bg-[#C6923A]/30'
+                    : 'text-[#C6BFA8] hover:text-[#F4EFE6] hover:bg-[#1C2822]'
+                }`}
+              >
+                {boardRotation}°
+              </button>
+              {onRotateBoardCW && (
+                <button
+                  type="button"
+                  data-testid="strip-rotate-cw-btn"
+                  aria-label="Rotate board 90 degrees clockwise"
+                  title="Rotate Board 90° Right (T)"
+                  onClick={onRotateBoardCW}
+                  className="w-6 h-6 rounded flex items-center justify-center bg-[#1C2822] hover:bg-[#283830] text-[#EADBC8] hover:text-[#C6923A] transition-colors cursor-pointer"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+                    <path d="M21 3v5h-5" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+
           {onCopyFen && (
             <button
               type="button"

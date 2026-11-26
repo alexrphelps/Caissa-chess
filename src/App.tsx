@@ -5,9 +5,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  calibrateSavedGamesAsync,
   computeAIMoveWithCadence,
   computeDeepCoachAnalysis,
   computeFullGameReviewAsync,
+  scoreRatedPlyAsync,
+  scoreRemainingRatedPliesAsync,
 } from './chess/aiClient';
 import {
   canUndoState,
@@ -22,6 +25,7 @@ import {
 import {
   createEngineProfileFromElo,
   createEngineProfileFromPreset,
+  createRatedOpponentProfileFromElo,
   evaluateBoardWhitePerspective,
   formatEvalScore,
   mapEloToLegacyDifficulty,
@@ -64,9 +68,30 @@ import {
   TurningPoint,
 } from './chess/gameReview';
 import {
+  applyRatedMatchResult,
+  clearJourneyProfile,
+  createInitialJourneyProfile,
+  getRankTierForRating,
+  getUndoAllowanceForRating,
+  isBlunderAlertEnabledForRating,
+  isSevereBlunderPly,
+  loadJourneyProfile,
+  RatedJourneyProfile,
+  RatedMatchOutcome,
+  RatedMatchResultSummary,
+  RatedMatchTermination,
+  SavedGamesCalibrationProgress,
+  SavedGamesCalibrationResult,
+  saveJourneyProfile,
+  ScoredPlayerPly,
+  StartingTierId,
+} from './chess/ratedJourney';
+import { loadPlayerPuzzleStats } from './chess/puzzles/ratingEngine';
+import {
   AIDifficulty,
   AIPresetId,
   AISearchResult,
+  BoardRotation,
   ChessEngineConfig,
   CoachPlaystyleKnobs,
   CoachPlaystylePresetId,
@@ -106,6 +131,7 @@ import {
 } from './components/GameHud';
 import { MasterGamesModal } from './components/MasterGamesModal';
 import { PuzzleModeView } from './components/PuzzleModeView';
+import { RatedJourneyView } from './components/RatedJourneyView';
 import { ReplayModeView } from './components/ReplayModeView';
 import { SavedGamesModal } from './components/SavedGamesModal';
 import { StatusModal } from './components/StatusModal';
@@ -122,6 +148,12 @@ import {
   SPLITTER_WIDTH_PX,
   UILayoutPreferences,
 } from './utils/layoutMath';
+import {
+  flipBoardRotation,
+  resolveBoardRotation,
+  rotateBoardCCW,
+  rotateBoardCW,
+} from './utils/boardOrientation';
 import { soundFX } from './utils/sound';
 
 const HELPER_STORAGE_KEY = 'caissa_helper_mode';
@@ -138,6 +170,11 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get('mode') === 'puzzle' || params.get('puzzle') === '1';
   }, []);
+  const initialJourney = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') === 'journey' || params.get('journey') === '1';
+  }, []);
   const initialAutostart = useMemo(() => {
     if (typeof window === 'undefined') return false;
     const params = new URLSearchParams(window.location.search);
@@ -153,8 +190,69 @@ export default function App() {
   });
   const [isSavedGamesOpen, setIsSavedGamesOpen] = useState<boolean>(false);
 
+  // Rated Journey Career Profile & Active Rated Match State
+  const [journeyProfile, setJourneyProfile] = useState<RatedJourneyProfile>(() =>
+    loadJourneyProfile()
+  );
+  const [isRatedJourneyGame, setIsRatedJourneyGame] = useState<boolean>(() =>
+    Boolean(initialAutostart && activeSession?.ratedJourney)
+  );
+  const [ratedMatchOpponentElo, setRatedMatchOpponentElo] = useState<number>(() =>
+    initialAutostart && activeSession?.ratedJourney
+      ? activeSession.ratedJourney.opponentElo
+      : 600
+  );
+  const [ratedUndosAllowed, setRatedUndosAllowed] = useState<number>(() =>
+    initialAutostart && activeSession?.ratedJourney
+      ? activeSession.ratedJourney.undosAllowed
+      : 3
+  );
+  const [ratedUndosRemaining, setRatedUndosRemaining] = useState<number>(() =>
+    initialAutostart && activeSession?.ratedJourney
+      ? activeSession.ratedJourney.undosRemaining
+      : 3
+  );
+  const [ratedUndosUsed, setRatedUndosUsed] = useState<number>(() =>
+    initialAutostart && activeSession?.ratedJourney
+      ? activeSession.ratedJourney.undosUsed
+      : 0
+  );
+  const [ratedBlunderAlert, setRatedBlunderAlert] = useState<{
+    plyIndex: number;
+    turnNumber: number;
+    playedSan: string;
+  } | null>(null);
+  const [ratedMatchSummary, setRatedMatchSummary] =
+    useState<RatedMatchResultSummary | null>(null);
+  const [isScoringRatedMatch, setIsScoringRatedMatch] = useState<boolean>(false);
+  const [ratedScoringProgress, setRatedScoringProgress] = useState<{
+    completed: number;
+    total: number;
+  } | null>(null);
+  const [isCalibratingSavedGames, setIsCalibratingSavedGames] =
+    useState<boolean>(false);
+  const [calibrationProgress, setCalibrationProgress] =
+    useState<SavedGamesCalibrationProgress | null>(null);
+  const [calibrationResult, setCalibrationResult] =
+    useState<SavedGamesCalibrationResult | null>(null);
+
+  const liveRatedScoresRef = useRef<Record<number, ScoredPlayerPly>>({});
+  const ratedMatchFinalizedRef = useRef<boolean>(false);
+  const ratedPlyAbortRef = useRef<AbortController | null>(null);
+  const ratedFinalizeAbortRef = useRef<AbortController | null>(null);
+  const calibrationAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      ratedPlyAbortRef.current?.abort();
+      ratedFinalizeAbortRef.current?.abort();
+      calibrationAbortRef.current?.abort();
+    };
+  }, []);
+
   const [shellState, setShellState] = useState<ShellState>(() => {
     if (initialPuzzle) return 'puzzles';
+    if (initialJourney) return 'journey';
     return initialAutostart ? 'playing' : 'title';
   });
   const [gameMode, setGameMode] = useState<GameMode>(() => {
@@ -168,6 +266,11 @@ export default function App() {
 
   // Granular Engine Profile State (persisted in localStorage, defaults to Casual 1000 or legacy saved difficulty)
   const [engineProfile, setEngineProfile] = useState<EngineProfileState>(() => {
+    if (initialAutostart && activeSession?.ratedJourney) {
+      return createRatedOpponentProfileFromElo(
+        activeSession.ratedJourney.opponentElo
+      );
+    }
     if (typeof window === 'undefined') {
       return createEngineProfileFromPreset('casual');
     }
@@ -226,7 +329,7 @@ export default function App() {
   const [replayBranchOrigin, setReplayBranchOrigin] =
     useState<ReplayBranchOrigin | null>(null);
   const [replayReturnShell, setReplayReturnShell] = useState<
-    'title' | 'playing'
+    'title' | 'playing' | 'journey'
   >('title');
 
   // Persisted UI & Board Layout Preferences (theme, coordinates, scale, Tactical Coach split width)
@@ -329,7 +432,8 @@ export default function App() {
     if (
       shellState === 'title' ||
       shellState === 'puzzles' ||
-      shellState === 'replay'
+      shellState === 'replay' ||
+      shellState === 'journey'
     ) {
       return;
     }
@@ -376,9 +480,13 @@ export default function App() {
     };
   }, [shellState]);
 
+  // Effective coach & eval bar visibility (strictly locked off during Rated Journey matches)
+  const effectiveCoachPanelOpen = !isRatedJourneyGame && uiPrefs.isCoachPanelOpen;
+  const effectiveShowEvalBar = !isRatedJourneyGame && uiPrefs.showEvalBar;
+
   // Split-pane geometry: side-by-side on desktop & zoomed desktop (>= 940px), stacked on narrow/mobile
   const canUseDesktopSplit = viewportSize.width >= 940;
-  const isDesktopSplit = canUseDesktopSplit && uiPrefs.isCoachPanelOpen;
+  const isDesktopSplit = canUseDesktopSplit && effectiveCoachPanelOpen;
   const lockViewportHeight = canUseDesktopSplit && viewportSize.height >= 540;
 
   const effectiveCoachWidth = useMemo(() => {
@@ -396,8 +504,8 @@ export default function App() {
       availableHeight: arenaSize.height,
       boardScale: uiPrefs.boardScale,
       coordinateStyle: uiPrefs.coordinateStyle,
-      showHelperBox: uiPrefs.showBoardTooltip,
-      showEvalBar: uiPrefs.showEvalBar,
+      showHelperBox: !isRatedJourneyGame && uiPrefs.showBoardTooltip,
+      showEvalBar: effectiveShowEvalBar,
       underBoardStripHeight,
       isStackedLayout: !canUseDesktopSplit || !lockViewportHeight,
     });
@@ -409,7 +517,8 @@ export default function App() {
     uiPrefs.boardScale,
     uiPrefs.coordinateStyle,
     uiPrefs.showBoardTooltip,
-    uiPrefs.showEvalBar,
+    isRatedJourneyGame,
+    effectiveShowEvalBar,
     canUseDesktopSplit,
     lockViewportHeight,
   ]);
@@ -688,10 +797,25 @@ export default function App() {
   const [lastSearchStats, setLastSearchStats] = useState<AISearchResult | null>(
     null
   );
-  const [isFlipped, setIsFlipped] = useState<boolean>(() => {
-    if (initialAutostart && activeSession) return activeSession.isFlipped;
-    return false;
+  const [boardRotation, setBoardRotation] = useState<BoardRotation>(() => {
+    if (initialAutostart && activeSession) {
+      return resolveBoardRotation(
+        activeSession.boardRotation,
+        activeSession.isFlipped
+      );
+    }
+    return 0;
   });
+  const isFlipped = boardRotation === 180;
+  const handleFlipBoard = useCallback(() => {
+    setBoardRotation((prev) => flipBoardRotation(prev));
+  }, []);
+  const handleRotateBoardCW = useCallback(() => {
+    setBoardRotation((prev) => rotateBoardCW(prev));
+  }, []);
+  const handleRotateBoardCCW = useCallback(() => {
+    setBoardRotation((prev) => rotateBoardCCW(prev));
+  }, []);
   const [isMuted, setIsMuted] = useState<boolean>(false);
 
   // Visual Helper Mode (persisted in localStorage, defaults to ON)
@@ -789,6 +913,7 @@ export default function App() {
         gameMode,
         playerColor,
         isFlipped,
+        boardRotation,
         engineProfile,
       });
       const pgn = exportSessionToPgn(session);
@@ -801,7 +926,7 @@ export default function App() {
     } catch {
       showToast('Failed to copy PGN');
     }
-  }, [stateStack, gameMode, playerColor, isFlipped, engineProfile, showToast]);
+  }, [stateStack, gameMode, playerColor, isFlipped, boardRotation, engineProfile, showToast]);
 
   const gameReviewAbortRef = useRef<AbortController | null>(null);
 
@@ -946,11 +1071,16 @@ export default function App() {
     !isAIThinking &&
     (gameMode === 'pass_and_play' || gameState.turn === playerColor);
 
+  // Effective helper flags (locked off in Rated Journey)
+  const effectiveHelperMode = !isRatedJourneyGame && helperMode;
+  const effectiveShowBoardSuggestions =
+    !isRatedJourneyGame && showBoardSuggestions;
+
   // Instant 3000+ fast tactical preview (up to 6-ply + Quiescence) so there is never an empty frame
   const fastHelperAnalysis: TacticsAnalysis | null = useMemo(() => {
-    if (!helperMode || !isHumanTurn) return null;
+    if (!effectiveHelperMode || !isHumanTurn) return null;
     return analyzeTactics(gameState, undefined, coachPlaystyle);
-  }, [helperMode, isHumanTurn, gameState, coachPlaystyle]);
+  }, [effectiveHelperMode, isHumanTurn, gameState, coachPlaystyle]);
 
   // Progressive 3000+ GM Deep Coach Multi-PV analysis (up to 14-16 ply + Quiescence) in the background Web Worker
   const [deepCoachState, setDeepCoachState] = useState<{
@@ -960,7 +1090,7 @@ export default function App() {
   } | null>(null);
 
   useEffect(() => {
-    if (!helperMode || !isHumanTurn) {
+    if (!effectiveHelperMode || !isHumanTurn) {
       return;
     }
 
@@ -988,10 +1118,10 @@ export default function App() {
       window.clearTimeout(debounceTimer);
       abortController.abort();
     };
-  }, [helperMode, isHumanTurn, gameState, coachPlaystyle, coachPlaystyleKey]);
+  }, [effectiveHelperMode, isHumanTurn, gameState, coachPlaystyle, coachPlaystyleKey]);
 
   const helperAnalysis: TacticsAnalysis | null = useMemo(() => {
-    if (!helperMode || !isHumanTurn) return null;
+    if (!effectiveHelperMode || !isHumanTurn) return null;
     if (
       deepCoachState &&
       deepCoachState.forState === gameState &&
@@ -1001,7 +1131,7 @@ export default function App() {
     }
     return fastHelperAnalysis;
   }, [
-    helperMode,
+    effectiveHelperMode,
     isHumanTurn,
     gameState,
     deepCoachState,
@@ -1032,11 +1162,120 @@ export default function App() {
     }
   }, []);
 
+  const finalizeRatedMatch = useCallback(
+    (
+      finalStack: GameState[],
+      outcome: RatedMatchOutcome,
+      termination: RatedMatchTermination
+    ) => {
+      if (!isRatedJourneyGame || ratedMatchFinalizedRef.current) return;
+      ratedMatchFinalizedRef.current = true;
+      ratedPlyAbortRef.current?.abort();
+      ratedFinalizeAbortRef.current?.abort();
+
+      const controller = new AbortController();
+      ratedFinalizeAbortRef.current = controller;
+      setIsScoringRatedMatch(true);
+      setRatedScoringProgress(null);
+      setRatedMatchSummary(null);
+      setRatedBlunderAlert(null);
+
+      const snapshotProfile = journeyProfile;
+      const oppElo = ratedMatchOpponentElo;
+      const side = playerColor;
+      const usedUndos = ratedUndosUsed;
+      const allowedUndos = ratedUndosAllowed;
+      const oppProfile = createRatedOpponentProfileFromElo(oppElo);
+
+      scoreRemainingRatedPliesAsync(
+        finalStack,
+        side,
+        { ...liveRatedScoresRef.current },
+        {
+          signal: controller.signal,
+          onProgress: (completed, total) => {
+            if (!controller.signal.aborted) {
+              setRatedScoringProgress({ completed, total });
+            }
+          },
+        }
+      ).then((scoredPlies) => {
+        if (controller.signal.aborted || !scoredPlies) return;
+
+        // Clear the in-progress auto-save now that the rated match has concluded
+        clearActiveSession();
+        setActiveSession(null);
+
+        // Auto-archive rated games with >= 6 moves so players can Replay/Review from Journey Hub
+        let archivedSessionId: string | undefined;
+        if (finalStack.length >= 11) {
+          const outcomeTag =
+            outcome === 'win' ? 'Win' : outcome === 'loss' ? 'Loss' : 'Draw';
+          const ratedSession = createStoredSession({
+            stateStack: finalStack,
+            gameMode: 'ai',
+            playerColor: side,
+            isFlipped: side === 'b',
+            engineProfile: oppProfile,
+            customTitle: `Rated vs. AI ${oppElo} Elo · ${outcomeTag}`,
+            isAutoSave: false,
+            ratedJourney: {
+              opponentElo: oppElo,
+              undosAllowed: allowedUndos,
+              undosRemaining: Math.max(0, allowedUndos - usedUndos),
+              undosUsed: usedUndos,
+              isFinalized: true,
+            },
+          });
+          archivedSessionId = ratedSession.id;
+          const updatedList = saveSessionSlot(ratedSession);
+          setSavedSessions(updatedList);
+        }
+
+        const { updatedProfile, summary } = applyRatedMatchResult(
+          snapshotProfile,
+          {
+            opponentElo: oppElo,
+            playerColor: side,
+            outcome,
+            termination,
+            scoredPlies,
+            undosUsed: usedUndos,
+            undosAllowed: allowedUndos,
+            totalPlies: Math.max(0, finalStack.length - 1),
+            sessionId: archivedSessionId,
+          }
+        );
+
+        saveJourneyProfile(updatedProfile);
+        setJourneyProfile(updatedProfile);
+        setRatedMatchSummary(summary);
+        setIsScoringRatedMatch(false);
+        setRatedScoringProgress(null);
+
+        if (summary.promotedTier) {
+          soundFX.playTierPromotion();
+        }
+      });
+    },
+    [
+      isRatedJourneyGame,
+      journeyProfile,
+      ratedMatchOpponentElo,
+      playerColor,
+      ratedUndosUsed,
+      ratedUndosAllowed,
+    ]
+  );
+
   const commitMove = useCallback(
     (move: Move) => {
       try {
-        const nextState = makeMove(gameState, move);
-        setStateStack((prev) => [...prev, nextState]);
+        const stateBefore = gameState;
+        const plyIndex = stateStack.length - 1;
+        const nextState = makeMove(stateBefore, move);
+        const nextStack = [...stateStack, nextState];
+        setStateStack(nextStack);
         setSelectedSquare(null);
         setPendingPromotion(null);
         setHighlightedHelperRank(null);
@@ -1044,8 +1283,54 @@ export default function App() {
         setPreviewPly(null);
         playMoveAudio(nextState, move);
 
+        // Background single-ply move scoring for Rated Journey player moves
+        if (isRatedJourneyGame && stateBefore.turn === playerColor) {
+          setRatedBlunderAlert(null);
+          const plyAbort = new AbortController();
+          ratedPlyAbortRef.current?.abort();
+          ratedPlyAbortRef.current = plyAbort;
+          const alertsEnabled = isBlunderAlertEnabledForRating(
+            journeyProfile.rating
+          );
+          scoreRatedPlyAsync(
+            stateBefore,
+            nextState,
+            plyIndex,
+            plyAbort.signal
+          ).then((scored) => {
+            if (!scored || plyAbort.signal.aborted) return;
+            liveRatedScoresRef.current[plyIndex] = scored;
+            if (
+              alertsEnabled &&
+              nextState.status === 'playing' &&
+              isSevereBlunderPly(scored)
+            ) {
+              setRatedBlunderAlert({
+                plyIndex,
+                turnNumber: scored.turnNumber,
+                playedSan: scored.playedSan,
+              });
+            }
+          });
+        }
+
         if (nextState.status !== 'playing') {
           setInspectingGameOverBoard(false);
+          if (isRatedJourneyGame) {
+            const outcome: RatedMatchOutcome =
+              nextState.status === 'checkmate'
+                ? nextState.winner === playerColor
+                  ? 'win'
+                  : 'loss'
+                : 'draw';
+            const termination: RatedMatchTermination =
+              nextState.status === 'checkmate'
+                ? 'checkmate'
+                : nextState.status === 'stalemate'
+                ? 'stalemate'
+                : 'draw';
+            finalizeRatedMatch(nextStack, outcome, termination);
+          }
           if (gameOverTimeoutRef.current !== null) {
             window.clearTimeout(gameOverTimeoutRef.current);
           }
@@ -1058,15 +1343,32 @@ export default function App() {
         console.error('Failed to commit move:', err);
       }
     },
-    [gameState, playMoveAudio]
+    [
+      gameState,
+      stateStack,
+      playMoveAudio,
+      isRatedJourneyGame,
+      playerColor,
+      journeyProfile.rating,
+      finalizeRatedMatch,
+    ]
   );
 
-  // Start / Restart game helper
+  // Start / Restart game helper (Custom or Local match — clears Rated Journey lock)
   const startNewMatch = useCallback(
     (overrideColor?: Color, overrideMode?: GameMode) => {
       clearPendingTimers();
+      ratedPlyAbortRef.current?.abort();
+      ratedFinalizeAbortRef.current?.abort();
       const nextColor = overrideColor ?? playerColor;
       const nextMode = overrideMode ?? gameMode;
+      setIsRatedJourneyGame(false);
+      setRatedBlunderAlert(null);
+      setRatedMatchSummary(null);
+      setIsScoringRatedMatch(false);
+      setRatedScoringProgress(null);
+      liveRatedScoresRef.current = {};
+      ratedMatchFinalizedRef.current = false;
       setIsAIThinking(false);
       setLastSearchStats(null);
       setSelectedSquare(null);
@@ -1081,8 +1383,9 @@ export default function App() {
       setReplayBranchOrigin(null);
       const initialStack = [createInitialGameState()];
       setStateStack(initialStack);
-      const nextFlipped = nextMode === 'ai' ? nextColor === 'b' : isFlipped;
-      setIsFlipped(nextFlipped);
+      const nextRotation: BoardRotation =
+        nextMode === 'ai' ? (nextColor === 'b' ? 180 : 0) : boardRotation;
+      setBoardRotation(nextRotation);
       setShellState('playing');
       document.body.dataset.state = 'playing';
 
@@ -1090,15 +1393,176 @@ export default function App() {
         stateStack: initialStack,
         gameMode: nextMode,
         playerColor: nextColor,
-        isFlipped: nextFlipped,
+        isFlipped: nextRotation === 180,
+        boardRotation: nextRotation,
         engineProfile,
         isAutoSave: true,
       });
       saveActiveSession(freshSession);
       setActiveSession(freshSession);
     },
-    [playerColor, gameMode, engineProfile, isFlipped, clearPendingTimers]
+    [playerColor, gameMode, engineProfile, boardRotation, clearPendingTimers]
   );
+
+  // Launch a Rated Journey match directly from the current profile
+  const startRatedJourneyMatch = useCallback(
+    (profileOverride?: RatedJourneyProfile) => {
+      const activeProfile = profileOverride ?? journeyProfile;
+      clearPendingTimers();
+      ratedPlyAbortRef.current?.abort();
+      ratedFinalizeAbortRef.current?.abort();
+      liveRatedScoresRef.current = {};
+      ratedMatchFinalizedRef.current = false;
+
+      const targetElo = activeProfile.nextOpponentElo;
+      const side = activeProfile.nextColor;
+      const allowedUndos = getUndoAllowanceForRating(activeProfile.rating);
+      const baseOpponentProfile = createRatedOpponentProfileFromElo(targetElo);
+      const opponentProfile = {
+        ...baseOpponentProfile,
+        label: `Rated Challenger (${targetElo} Elo)`,
+      };
+
+      setIsRatedJourneyGame(true);
+      setRatedMatchOpponentElo(targetElo);
+      setRatedUndosAllowed(allowedUndos);
+      setRatedUndosRemaining(allowedUndos);
+      setRatedUndosUsed(0);
+      setRatedBlunderAlert(null);
+      setRatedMatchSummary(null);
+      setIsScoringRatedMatch(false);
+      setRatedScoringProgress(null);
+
+      setGameMode('ai');
+      setPlayerColor(side);
+      setEngineProfile(opponentProfile);
+      setBoardRotation(side === 'b' ? 180 : 0);
+      setIsAIThinking(false);
+      setLastSearchStats(null);
+      setSelectedSquare(null);
+      setPendingPromotion(null);
+      setHighlightedHelperRank(null);
+      setPlannedArrows([]);
+      setPreviewPly(null);
+      setInspectingGameOverBoard(false);
+      setIsGameReviewOpen(false);
+      setGameReviewReport(null);
+      setRetryBlunderSession(null);
+      setReplayBranchOrigin(null);
+
+      const initialStack = [createInitialGameState()];
+      setStateStack(initialStack);
+      clearActiveSession();
+      setActiveSession(null);
+      setShellState('playing');
+      document.body.dataset.state = 'playing';
+    },
+    [journeyProfile, clearPendingTimers]
+  );
+
+  const handleReturnToTitle = useCallback(() => {
+    clearPendingTimers();
+    ratedPlyAbortRef.current?.abort();
+    ratedFinalizeAbortRef.current?.abort();
+    setIsAIThinking(false);
+    setSelectedSquare(null);
+    setPendingPromotion(null);
+    setHighlightedHelperRank(null);
+    setPlannedArrows([]);
+    setPreviewPly(null);
+    setInspectingGameOverBoard(false);
+    setIsGameReviewOpen(false);
+    setRetryBlunderSession(null);
+    setIsRatedJourneyGame(false);
+    setShellState('title');
+    document.body.dataset.state = 'title';
+  }, [clearPendingTimers]);
+
+  const handleOpenJourney = useCallback(() => {
+    clearPendingTimers();
+    setIsAIThinking(false);
+    setSelectedSquare(null);
+    setPendingPromotion(null);
+    setHighlightedHelperRank(null);
+    setPlannedArrows([]);
+    setPreviewPly(null);
+    setInspectingGameOverBoard(false);
+    setShellState('journey');
+    document.body.dataset.state = 'journey';
+  }, [clearPendingTimers]);
+
+  const handleSelectStartingTier = useCallback(
+    (tierId: StartingTierId, customElo?: number) => {
+      const initializedProfile = createInitialJourneyProfile(tierId, customElo);
+      saveJourneyProfile(initializedProfile);
+      setJourneyProfile(initializedProfile);
+      setCalibrationResult(null);
+      showToast(
+        `Rated Journey started at ${initializedProfile.rating} Elo`
+      );
+    },
+    [showToast]
+  );
+
+  const handleResetJourney = useCallback(() => {
+    const fresh = clearJourneyProfile();
+    setJourneyProfile(fresh);
+    setIsRatedJourneyGame(false);
+    setRatedMatchSummary(null);
+    setCalibrationResult(null);
+    showToast('Rated Journey reset');
+  }, [showToast]);
+
+  const handleRunSavedGamesCalibration = useCallback(() => {
+    calibrationAbortRef.current?.abort();
+    const controller = new AbortController();
+    calibrationAbortRef.current = controller;
+    setIsCalibratingSavedGames(true);
+    setCalibrationProgress({
+      completedGames: 0,
+      totalGames: Math.min(5, savedSessions.length),
+      currentGameTitle: 'Preparing archive scan...',
+    });
+
+    const puzzleStats = loadPlayerPuzzleStats();
+    const puzzlePrior =
+      puzzleStats.totalSolved + puzzleStats.totalFailed >= 3
+        ? puzzleStats.rating
+        : null;
+
+    calibrateSavedGamesAsync(savedSessions, puzzlePrior, {
+      signal: controller.signal,
+      onProgress: (prog) => {
+        if (!controller.signal.aborted) {
+          setCalibrationProgress(prog);
+        }
+      },
+    }).then((result) => {
+      if (controller.signal.aborted) return;
+      setIsCalibratingSavedGames(false);
+      setCalibrationProgress(null);
+      if (result) {
+        setCalibrationResult(result);
+      }
+    });
+  }, [savedSessions]);
+
+  const handleResignRatedMatch = useCallback(() => {
+    if (!isRatedJourneyGame || gameState.status !== 'playing') return;
+    clearPendingTimers();
+    setIsAIThinking(false);
+    setInspectingGameOverBoard(false);
+    soundFX.playGameOver(false);
+    finalizeRatedMatch(stateStack, 'loss', 'resignation');
+    setShellState('gameover');
+    document.body.dataset.state = 'gameover';
+  }, [
+    isRatedJourneyGame,
+    gameState.status,
+    clearPendingTimers,
+    finalizeRatedMatch,
+    stateStack,
+  ]);
 
   const handleOpenPuzzles = useCallback(() => {
     clearPendingTimers();
@@ -1142,7 +1606,13 @@ export default function App() {
   const handleOpenSessionInReplay = useCallback(
     (session: StoredGameSession) => {
       const parsed = convertSessionToParsedPgnGame(session);
-      setReplayReturnShell(shellState === 'title' ? 'title' : 'playing');
+      setReplayReturnShell(
+        shellState === 'title'
+          ? 'title'
+          : shellState === 'journey'
+          ? 'journey'
+          : 'playing'
+      );
       handleSelectReplayGame(parsed, Math.max(0, parsed.timeline.length - 1));
     },
     [shellState, handleSelectReplayGame]
@@ -1209,7 +1679,8 @@ export default function App() {
       setStateStack(branchStack);
       setGameMode(nextGameMode);
       setPlayerColor(nextPlayerColor);
-      setIsFlipped(shouldFlip);
+      const branchRotation: BoardRotation = shouldFlip ? 180 : 0;
+      setBoardRotation(branchRotation);
       setReplayBranchOrigin({ game: activeReplayGame, branchPly: ply });
       setShellState('playing');
       document.body.dataset.state = 'playing';
@@ -1219,6 +1690,7 @@ export default function App() {
         gameMode: nextGameMode,
         playerColor: nextPlayerColor,
         isFlipped: shouldFlip,
+        boardRotation: branchRotation,
         engineProfile,
         customTitle: `${activeReplayGame.headers.White} vs. ${activeReplayGame.headers.Black} (Ply ${ply})`,
         isAutoSave: true,
@@ -1243,44 +1715,103 @@ export default function App() {
     );
   }, [replayBranchOrigin, handleSelectReplayGame]);
 
-  // Auto-save active game session whenever moves are played or game state updates
+  // Auto-save active game session strictly while actively playing or paused
   useEffect(() => {
-    if (stateStack.length > 1) {
+    if (
+      (shellState === 'playing' || shellState === 'paused') &&
+      stateStack.length > 1
+    ) {
+      if (isRatedJourneyGame && ratedMatchFinalizedRef.current) {
+        return;
+      }
+      const ratedJourneyMeta = isRatedJourneyGame
+        ? {
+            opponentElo: ratedMatchOpponentElo,
+            undosAllowed: ratedUndosAllowed,
+            undosRemaining: ratedUndosRemaining,
+            undosUsed: ratedUndosUsed,
+            isFinalized: ratedMatchFinalizedRef.current,
+          }
+        : undefined;
       const session = createStoredSession({
         stateStack,
         gameMode,
         playerColor,
         isFlipped,
+        boardRotation,
         engineProfile,
         isAutoSave: true,
+        ratedJourney: ratedJourneyMeta,
       });
       saveActiveSession(session);
       setActiveSession(session);
     }
-  }, [stateStack, gameMode, playerColor, isFlipped, engineProfile]);
+  }, [
+    shellState,
+    stateStack,
+    gameMode,
+    playerColor,
+    isFlipped,
+    boardRotation,
+    engineProfile,
+    isRatedJourneyGame,
+    ratedMatchOpponentElo,
+    ratedUndosAllowed,
+    ratedUndosRemaining,
+    ratedUndosUsed,
+  ]);
 
   const handleSaveCurrentSession = useCallback(
     (customTitle?: string) => {
+      const ratedJourneyMeta = isRatedJourneyGame
+        ? {
+            opponentElo: ratedMatchOpponentElo,
+            undosAllowed: ratedUndosAllowed,
+            undosRemaining: ratedUndosRemaining,
+            undosUsed: ratedUndosUsed,
+            isFinalized: ratedMatchFinalizedRef.current,
+          }
+        : undefined;
       const session = createStoredSession({
         stateStack,
         gameMode,
         playerColor,
         isFlipped,
+        boardRotation,
         engineProfile,
         customTitle,
         isAutoSave: false,
+        ratedJourney: ratedJourneyMeta,
       });
       const updated = saveSessionSlot(session);
       setSavedSessions(updated);
-      saveActiveSession(session);
-      setActiveSession(session);
+      if (!(isRatedJourneyGame && ratedMatchFinalizedRef.current)) {
+        saveActiveSession(session);
+        setActiveSession(session);
+      }
     },
-    [stateStack, gameMode, playerColor, isFlipped, engineProfile]
+    [
+      stateStack,
+      gameMode,
+      playerColor,
+      isFlipped,
+      boardRotation,
+      engineProfile,
+      isRatedJourneyGame,
+      ratedMatchOpponentElo,
+      ratedUndosAllowed,
+      ratedUndosRemaining,
+      ratedUndosUsed,
+    ]
   );
 
   const handleLoadSession = useCallback(
     (session: StoredGameSession) => {
       clearPendingTimers();
+      ratedPlyAbortRef.current?.abort();
+      ratedFinalizeAbortRef.current?.abort();
+      liveRatedScoresRef.current = {};
+
       setIsAIThinking(false);
       setLastSearchStats(null);
       setSelectedSquare(null);
@@ -1289,21 +1820,65 @@ export default function App() {
       setPlannedArrows([]);
       setPreviewPly(null);
       setInspectingGameOverBoard(false);
+      setIsGameReviewOpen(false);
+      setGameReviewReport(null);
+      setRetryBlunderSession(null);
+      setReplayBranchOrigin(null);
+      setRatedBlunderAlert(null);
+      setRatedMatchSummary(null);
+      setIsScoringRatedMatch(false);
+      setRatedScoringProgress(null);
 
-      setStateStack(session.stateStack);
-      setGameMode(session.gameMode);
-      setPlayerColor(session.playerColor);
-      setIsFlipped(session.isFlipped);
-      if (session.engineProfile) {
-        persistEngineProfile(session.engineProfile);
+      const latestState =
+        session.stateStack[session.stateStack.length - 1] ??
+        createInitialGameState();
+      const ratedMeta = session.ratedJourney;
+
+      if (ratedMeta) {
+        const isFinished =
+          Boolean(ratedMeta.isFinalized) || latestState.status !== 'playing';
+        ratedMatchFinalizedRef.current = isFinished;
+        setIsRatedJourneyGame(true);
+        setRatedMatchOpponentElo(ratedMeta.opponentElo);
+        setRatedUndosAllowed(ratedMeta.undosAllowed);
+        setRatedUndosRemaining(ratedMeta.undosRemaining);
+        setRatedUndosUsed(ratedMeta.undosUsed);
+        setGameMode('ai');
+        setPlayerColor(session.playerColor);
+        setBoardRotation(
+          resolveBoardRotation(session.boardRotation, session.isFlipped)
+        );
+        const restoredOppProfile = createRatedOpponentProfileFromElo(
+          ratedMeta.opponentElo
+        );
+        setEngineProfile(restoredOppProfile);
+        setStateStack(session.stateStack);
+        if (!isFinished) {
+          saveActiveSession(session);
+          setActiveSession(session);
+        }
+        showToast(`Resumed Rated Journey · vs. AI ${ratedMeta.opponentElo} Elo`);
+      } else {
+        ratedMatchFinalizedRef.current = false;
+        setIsRatedJourneyGame(false);
+        setStateStack(session.stateStack);
+        setGameMode(session.gameMode);
+        setPlayerColor(session.playerColor);
+        setBoardRotation(
+          resolveBoardRotation(session.boardRotation, session.isFlipped)
+        );
+        if (session.engineProfile) {
+          persistEngineProfile(session.engineProfile);
+        }
+        saveActiveSession(session);
+        setActiveSession(session);
       }
-      saveActiveSession(session);
-      setActiveSession(session);
+
       setShellState('playing');
       document.body.dataset.state = 'playing';
       soundFX.playMove();
     },
-    [clearPendingTimers, persistEngineProfile]
+    [clearPendingTimers, persistEngineProfile, showToast]
   );
 
   const handleDeleteSession = useCallback((id: string) => {
@@ -1500,7 +2075,17 @@ export default function App() {
 
   const handleUndoMove = useCallback(() => {
     if (!canUndoState(stateStack, gameMode, playerColor)) return;
+    if (isRatedJourneyGame) {
+      if (ratedUndosRemaining <= 0) {
+        showToast('No Undos remaining in this Rated Match');
+        return;
+      }
+      if (gameState.status !== 'playing') {
+        return;
+      }
+    }
     clearPendingTimers();
+    ratedPlyAbortRef.current?.abort();
     setIsAIThinking(false);
     setLastSearchStats(null);
     setSelectedSquare(null);
@@ -1509,11 +2094,42 @@ export default function App() {
     setPlannedArrows([]);
     setPreviewPly(null);
     setInspectingGameOverBoard(false);
+    setRatedBlunderAlert(null);
     soundFX.playUndo();
 
-    setStateStack((prev) => rewindStateStack(prev, gameMode, playerColor));
+    const rewoundStack = rewindStateStack(stateStack, gameMode, playerColor);
+    if (isRatedJourneyGame) {
+      const maxValidPly = rewoundStack.length - 1;
+      for (const key of Object.keys(liveRatedScoresRef.current)) {
+        const plyNum = Number(key);
+        if (plyNum >= maxValidPly) {
+          delete liveRatedScoresRef.current[plyNum];
+        }
+      }
+      const nextRemaining = Math.max(0, ratedUndosRemaining - 1);
+      setRatedUndosRemaining(nextRemaining);
+      setRatedUndosUsed((prev) => prev + 1);
+      showToast(
+        nextRemaining > 0
+          ? `Move undone · ${nextRemaining} ${
+              nextRemaining === 1 ? 'Undo' : 'Undos'
+            } remaining`
+          : 'Move undone · Last Undo used for this match'
+      );
+    }
+
+    setStateStack(rewoundStack);
     setShellState('playing');
-  }, [stateStack, gameMode, playerColor, clearPendingTimers]);
+  }, [
+    stateStack,
+    gameMode,
+    playerColor,
+    isRatedJourneyGame,
+    ratedUndosRemaining,
+    gameState.status,
+    clearPendingTimers,
+    showToast,
+  ]);
 
   const handleToggleMute = useCallback(() => {
     setIsMuted((prev) => {
@@ -1524,8 +2140,19 @@ export default function App() {
   }, []);
 
   const canUndo = useMemo(() => {
-    return canUndoState(stateStack, gameMode, playerColor);
-  }, [stateStack, gameMode, playerColor]);
+    if (!canUndoState(stateStack, gameMode, playerColor)) return false;
+    if (isRatedJourneyGame) {
+      return gameState.status === 'playing' && ratedUndosRemaining > 0;
+    }
+    return true;
+  }, [
+    stateStack,
+    gameMode,
+    playerColor,
+    isRatedJourneyGame,
+    gameState.status,
+    ratedUndosRemaining,
+  ]);
 
   // Global keyboard shortcuts (Enter/Space on Title, P/Escape for Pause, R for New Game, F for Flip, M for Mute, H for Helper, B for Board Suggestions, U/Ctrl+Z for Undo)
   useEffect(() => {
@@ -1544,7 +2171,7 @@ export default function App() {
         return;
       }
 
-      if (shellState === 'replay') {
+      if (shellState === 'replay' || shellState === 'journey') {
         return;
       }
 
@@ -1600,15 +2227,29 @@ export default function App() {
           setIsSavedGamesOpen((prev) => !prev);
         }
       } else if (e.key === 'f' || e.key === 'F') {
-        setIsFlipped((prev) => !prev);
+        handleFlipBoard();
+      } else if (e.key === 't' || e.key === 'T') {
+        if (e.shiftKey) {
+          handleRotateBoardCCW();
+        } else {
+          handleRotateBoardCW();
+        }
       } else if (e.key === 'r' || e.key === 'R') {
-        startNewMatch();
+        if (isRatedJourneyGame) {
+          startRatedJourneyMatch();
+        } else {
+          startNewMatch();
+        }
       } else if (e.key === 'm' || e.key === 'M') {
         handleToggleMute();
       } else if (e.key === 'h' || e.key === 'H') {
-        handleToggleHelperMode();
+        if (!isRatedJourneyGame) {
+          handleToggleHelperMode();
+        }
       } else if (e.key === 'b' || e.key === 'B') {
-        handleToggleBoardSuggestions();
+        if (!isRatedJourneyGame) {
+          handleToggleBoardSuggestions();
+        }
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
         setPreviewPly((prev) => {
@@ -1656,10 +2297,46 @@ export default function App() {
     stateStack.length,
     handleUndoMove,
     startNewMatch,
+    startRatedJourneyMatch,
+    isRatedJourneyGame,
     handleToggleMute,
     handleToggleHelperMode,
     handleToggleBoardSuggestions,
   ]);
+
+  if (shellState === 'journey') {
+    const puzzleStats = loadPlayerPuzzleStats();
+    const puzzlePrior =
+      puzzleStats.totalSolved + puzzleStats.totalFailed >= 3
+        ? puzzleStats.rating
+        : null;
+    return (
+      <RatedJourneyView
+        profile={journeyProfile}
+        savedSessions={savedSessions}
+        puzzleRatingPrior={puzzlePrior}
+        calibrationProgress={calibrationProgress}
+        calibrationResult={calibrationResult}
+        isCalibrating={isCalibratingSavedGames}
+        onSelectStartingTier={handleSelectStartingTier}
+        onStartNextMatch={() => startRatedJourneyMatch()}
+        onRunSavedGamesCalibration={handleRunSavedGamesCalibration}
+        onResetJourney={handleResetJourney}
+        onOpenMatchInReplay={(sessionId) => {
+          const found = savedSessions.find((s) => s.id === sessionId);
+          if (found) {
+            handleOpenSessionInReplay(found);
+          }
+        }}
+        onExit={() => {
+          calibrationAbortRef.current?.abort();
+          setIsCalibratingSavedGames(false);
+          setShellState('title');
+          document.body.dataset.state = 'title';
+        }}
+      />
+    );
+  }
 
   if (shellState === 'puzzles') {
     return (
@@ -1756,10 +2433,11 @@ export default function App() {
           engineProfile={engineProfile}
           activeSession={activeSession}
           savedSessionsCount={savedSessions.length}
+          journeyProfile={journeyProfile}
           onSelectMode={setGameMode}
           onSelectColor={(color) => {
             setPlayerColor(color);
-            setIsFlipped(color === 'b');
+            setBoardRotation(color === 'b' ? 180 : 0);
           }}
           onSelectDifficulty={handleSelectDifficulty}
           onSelectPreset={handleSelectPreset}
@@ -1773,6 +2451,7 @@ export default function App() {
           }}
           onOpenPuzzles={handleOpenPuzzles}
           onOpenMasterGames={handleOpenMasterGamesModal}
+          onOpenJourney={handleOpenJourney}
           onStartGame={() => startNewMatch()}
         />
         <MasterGamesModal
@@ -1837,6 +2516,7 @@ export default function App() {
         lastSearchStats={lastSearchStats}
         showEngineStats={showEngineStats}
         isFlipped={isFlipped}
+        boardRotation={boardRotation}
         isAIThinking={isAIThinking}
         canUndo={canUndo}
         isMuted={isMuted}
@@ -1869,8 +2549,13 @@ export default function App() {
             commitMove(rec.move);
           }
         }}
-        onNewGame={() => startNewMatch()}
-        onFlipBoard={() => setIsFlipped((prev) => !prev)}
+        onNewGame={() =>
+          isRatedJourneyGame ? startRatedJourneyMatch() : startNewMatch()
+        }
+        onFlipBoard={handleFlipBoard}
+        onRotateBoardCW={handleRotateBoardCW}
+        onRotateBoardCCW={handleRotateBoardCCW}
+        onSetBoardRotation={setBoardRotation}
         onTogglePlayAsColor={(nextColor) => {
           setPlayerColor(nextColor);
           startNewMatch(nextColor, gameMode);
@@ -1881,6 +2566,7 @@ export default function App() {
         }}
         onUndoMove={handleUndoMove}
         onOpenPause={() => setShellState('paused')}
+        onReturnToTitle={handleReturnToTitle}
         onToggleMute={handleToggleMute}
         onOpenPuzzles={handleOpenPuzzles}
         onOpenMasterGames={handleOpenMasterGamesModal}
@@ -1895,6 +2581,20 @@ export default function App() {
         onOpenGameReview={handleOpenGameReview}
         onCopyFen={handleCopyCurrentFen}
         onCopyPgn={handleCopyCurrentPgn}
+        ratedJourneyContext={
+          isRatedJourneyGame
+            ? {
+                playerRating: journeyProfile.rating,
+                playerRd: journeyProfile.rd,
+                opponentElo: ratedMatchOpponentElo,
+                undosRemaining: ratedUndosRemaining,
+                undosAllowed: ratedUndosAllowed,
+                tierName: getRankTierForRating(journeyProfile.rating).name,
+                onResignMatch: handleResignRatedMatch,
+                onOpenJourneyHub: handleOpenJourney,
+              }
+            : null
+        }
       />
 
       {/* Full-Viewport Fluid Split-Pane Arena: Left (Auto-Fit Resizable Board + Strip) · Draggable Divider · Right (Scalable Tactical Coach) */}
@@ -1914,7 +2614,7 @@ export default function App() {
           }`}
         >
           <div className="flex items-start justify-center gap-2 max-w-full">
-            {uiPrefs.showEvalBar && (() => {
+            {effectiveShowEvalBar && (() => {
               let evalCp: number;
               if (displayedGameState.status === 'checkmate') {
                 evalCp = displayedGameState.winner === 'w' ? 100000 : -100000;
@@ -1935,6 +2635,7 @@ export default function App() {
                   formattedScore={formatEvalScore(evalCp)}
                   heightPx={boardGeometry.frameHeightPx}
                   isFlipped={isFlipped}
+                  boardRotation={boardRotation}
                   isLoading={isAIThinking}
                 />
               );
@@ -1946,9 +2647,10 @@ export default function App() {
               selectedSquare={isPreviewingHistory ? null : selectedSquare}
               pendingPromotion={pendingPromotion}
               isFlipped={isFlipped}
+              boardRotation={boardRotation}
               isInteractionDisabled={isBoardLocked}
-              helperMode={isPreviewingHistory ? false : helperMode}
-              showBoardSuggestions={showBoardSuggestions}
+              helperMode={isPreviewingHistory ? false : effectiveHelperMode}
+              showBoardSuggestions={effectiveShowBoardSuggestions}
               isPreviewingHistory={isPreviewingHistory}
               helperAnalysis={helperAnalysis}
               highlightedHelperRank={highlightedHelperRank}
@@ -1981,7 +2683,7 @@ export default function App() {
               onClearPlannedArrows={handleClearPlannedArrows}
               onSelectPromotion={handleSelectPromotion}
               onCancelPromotion={() => setPendingPromotion(null)}
-              hideHelperBox={!uiPrefs.showBoardTooltip}
+              hideHelperBox={isRatedJourneyGame || !uiPrefs.showBoardTooltip}
               boardSizePx={boardGeometry.boardSizePx}
               maxFitSizePx={boardGeometry.maxFitSizePx}
               boardTheme={uiPrefs.boardTheme}
@@ -1995,22 +2697,75 @@ export default function App() {
             />
           </div>
 
+          {/* Beginner (<1000 Elo) Quiet Blunder Alert Strip during Rated Journey */}
+          {isRatedJourneyGame &&
+            ratedBlunderAlert &&
+            gameState.status === 'playing' && (
+              <div
+                data-testid="rated-blunder-alert"
+                role="status"
+                className="w-full max-w-xl px-3.5 py-2 rounded-lg bg-[#241E12] border border-[#C6923A]/70 flex items-center justify-between gap-3 text-xs"
+              >
+                <div className="min-w-0 text-[#F4EFE6]">
+                  <span className="font-mono font-bold text-[#FACC15]">
+                    Blunder Alert · Move {ratedBlunderAlert.turnNumber} (
+                    {ratedBlunderAlert.playedSan})
+                  </span>
+                  <span className="text-[#D6CFC2] ml-2">
+                    {ratedUndosRemaining > 0
+                      ? `Heavy mistake spotted — ${ratedUndosRemaining} ${
+                          ratedUndosRemaining === 1 ? 'Undo' : 'Undos'
+                        } left if you want to rethink.`
+                      : 'Heavy mistake spotted (0 Undos left).'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {ratedUndosRemaining > 0 && canUndo && (
+                    <button
+                      type="button"
+                      data-testid="rated-blunder-undo-btn"
+                      onClick={handleUndoMove}
+                      className="px-2.5 py-1 rounded bg-[#C6923A] hover:bg-[#D4A048] text-[#111815] font-bold text-[11px] cursor-pointer whitespace-nowrap"
+                    >
+                      Use Undo
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    aria-label="Dismiss blunder alert"
+                    onClick={() => setRatedBlunderAlert(null)}
+                    className="px-2 py-1 rounded bg-[#1A241E] hover:bg-[#25332B] text-[#A69F91] text-[11px] cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
+
           <UnderBoardPlayerStrip
             gameState={displayedGameState}
             gameMode={gameMode}
             playerColor={playerColor}
             aiDifficulty={aiDifficulty}
             engineProfile={engineProfile}
+            boardRotation={boardRotation}
             previewPly={previewPly}
             totalPlies={stateStack.length - 1}
             frameWidthPx={
               boardGeometry.frameWidthPx +
-              (uiPrefs.showEvalBar ? EVAL_BAR_RESERVE_PX : 0)
+              (effectiveShowEvalBar ? EVAL_BAR_RESERVE_PX : 0)
             }
             onPreviewPly={setPreviewPly}
+            onRotateBoardCW={handleRotateBoardCW}
+            onRotateBoardCCW={handleRotateBoardCCW}
+            onFlipBoard={handleFlipBoard}
             onCopyFen={handleCopyCurrentFen}
             onCopyPgn={handleCopyCurrentPgn}
-            onOpenGameReview={handleOpenGameReview}
+            onOpenGameReview={
+              isRatedJourneyGame && gameState.status === 'playing'
+                ? undefined
+                : handleOpenGameReview
+            }
           />
         </div>
 
@@ -2060,8 +2815,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Right Column: Scalable & Reflowable Tactical Coach Panel */}
-        {uiPrefs.isCoachPanelOpen && (
+        {/* Right Column: Scalable & Reflowable Tactical Coach Panel (locked hidden during Rated Journey) */}
+        {effectiveCoachPanelOpen && (
           <TacticalCoachPanel
             gameState={gameState}
             helperMode={helperMode}
@@ -2096,6 +2851,8 @@ export default function App() {
         preferences={uiPrefs}
         currentBoardPx={boardGeometry.boardSizePx}
         maxFitBoardPx={boardGeometry.maxFitSizePx}
+        boardRotation={boardRotation}
+        onChangeBoardRotation={setBoardRotation}
         onClose={() => setIsBoardCustomizerOpen(false)}
         onChangePreferences={(patch) => updateUiPrefs(patch, true)}
         onResetDefaults={resetUiPrefs}
@@ -2134,8 +2891,17 @@ export default function App() {
           onStartRetryBlunder={handleStartRetryBlunder}
           onPlayAgain={() => {
             setIsGameReviewOpen(false);
-            startNewMatch();
+            if (isRatedJourneyGame) {
+              startRatedJourneyMatch();
+            } else {
+              startNewMatch();
+            }
           }}
+          playAgainLabel={
+            isRatedJourneyGame
+              ? `Next Rated Match · vs. AI ${journeyProfile.nextOpponentElo}`
+              : 'Play Again'
+          }
           onOpenInReplay={handleOpenCurrentMatchInReplay}
         />
       )}
@@ -2253,13 +3019,15 @@ export default function App() {
           gameState={gameState}
           gameMode={gameMode}
           playerColor={playerColor}
+          isRatedJourneyGame={isRatedJourneyGame}
+          isScoringRatedMatch={isScoringRatedMatch}
+          ratedScoringProgress={ratedScoringProgress}
+          ratedMatchSummary={ratedMatchSummary}
           onResume={() => setShellState('playing')}
-          onNewGame={() => startNewMatch()}
-          onReturnToTitle={() => {
-            clearPendingTimers();
-            setIsAIThinking(false);
-            setShellState('title');
-          }}
+          onNewGame={() =>
+            isRatedJourneyGame ? startRatedJourneyMatch() : startNewMatch()
+          }
+          onReturnToTitle={handleReturnToTitle}
           onInspectBoard={() => {
             setInspectingGameOverBoard(true);
             setShellState('playing');
@@ -2267,6 +3035,8 @@ export default function App() {
           onOpenSavedGames={() => setIsSavedGamesOpen(true)}
           onOpenGameReview={handleOpenGameReview}
           onOpenInReplay={handleOpenCurrentMatchInReplay}
+          onNextRatedMatch={() => startRatedJourneyMatch()}
+          onOpenJourneyHub={handleOpenJourney}
         />
       )}
 
@@ -2311,10 +3081,13 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={() => startNewMatch()}
+              data-testid="inspect-new-game-btn"
+              onClick={() =>
+                isRatedJourneyGame ? startRatedJourneyMatch() : startNewMatch()
+              }
               className="px-3 py-1.5 rounded-lg bg-[#212E27] hover:bg-[#2B3B32] border border-[#34463C] text-xs font-semibold text-[#F4EFE6] transition-colors cursor-pointer"
             >
-              New Game [R]
+              {isRatedJourneyGame ? 'Next Rated Match [R]' : 'New Game [R]'}
             </button>
             <button
               type="button"

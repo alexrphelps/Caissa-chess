@@ -3,11 +3,7 @@ import {
   canPlanArrow,
   computeSlideOffset,
   coordsToSquare,
-  FILES,
   findKingSquare,
-  isValidSquare,
-  RANKS,
-  squareToCoords,
 } from '../chess/engine';
 import {
   RecommendedMove,
@@ -15,6 +11,7 @@ import {
   ThreatenedPieceInfo,
 } from '../chess/tacticsHelper';
 import {
+  BoardRotation,
   GameState,
   Move,
   Piece,
@@ -23,6 +20,13 @@ import {
   Square,
 } from '../chess/types';
 import { ChessPieceSvg, PIECE_NAMES } from './ChessPieceSvg';
+import {
+  describeBoardRotation,
+  getBoardEdgeLabels,
+  resolveBoardRotation,
+  squareToSvgCenterCoords,
+  visualToBoardCoords,
+} from '../utils/boardOrientation';
 import {
   BOARD_THEMES,
   BoardThemeId,
@@ -39,6 +43,7 @@ interface ChessBoardProps {
   selectedSquare: Square | null;
   pendingPromotion: { from: Square; to: Square } | null;
   isFlipped: boolean;
+  boardRotation?: BoardRotation;
   isInteractionDisabled: boolean;
   helperMode: boolean;
   showBoardSuggestions: boolean;
@@ -124,6 +129,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   selectedSquare,
   pendingPromotion,
   isFlipped,
+  boardRotation,
   isInteractionDisabled,
   helperMode,
   showBoardSuggestions,
@@ -279,12 +285,9 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     return () => window.clearTimeout(timer);
   }, [slidingMove]);
 
-  const rowIndices = isFlipped
-    ? [7, 6, 5, 4, 3, 2, 1, 0]
-    : [0, 1, 2, 3, 4, 5, 6, 7];
-  const colIndices = isFlipped
-    ? [7, 6, 5, 4, 3, 2, 1, 0]
-    : [0, 1, 2, 3, 4, 5, 6, 7];
+  const effectiveRotation = resolveBoardRotation(boardRotation, isFlipped);
+  const edgeLabels = getBoardEdgeLabels(effectiveRotation);
+  const visualIndices = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 
   const getBoardPointInfo = useCallback(
     (
@@ -318,15 +321,18 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
         7,
         Math.max(0, Math.floor((relY / rect.height) * 8))
       );
-      const row = isFlipped ? 7 - visualRow : visualRow;
-      const col = isFlipped ? 7 - visualCol : visualCol;
+      const { row, col } = visualToBoardCoords(
+        visualRow,
+        visualCol,
+        effectiveRotation
+      );
       return {
         square: coordsToSquare(row, col),
         relX,
         relY,
       };
     },
-    [isFlipped]
+    [effectiveRotation]
   );
 
   // Global pointermove/pointerup listeners while left-holding a ghost piece (supports mouse & touch)
@@ -479,13 +485,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
 
   // Convert a board square ('a1'..'h8') to SVG viewBox (0..100) center coordinates
   const squareToSvgCenter = (sq: Square): { x: number; y: number } => {
-    const { row, col } = squareToCoords(sq);
-    const visualRow = isFlipped ? 7 - row : row;
-    const visualCol = isFlipped ? 7 - col : col;
-    return {
-      x: (visualCol + 0.5) * 12.5,
-      y: (visualRow + 0.5) * 12.5,
-    };
+    return squareToSvgCenterCoords(sq, effectiveRotation);
   };
 
   // Compute active tooltip text when hovering a recommended move or threatened piece square
@@ -605,43 +605,48 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
         data-testid="chess-board-frame"
         data-board-theme={activeTheme.id}
         data-board-size={boardSizePx ?? undefined}
+        data-board-rotation={effectiveRotation}
         className="relative p-2.5 sm:p-3 rounded-xl border-2 shadow-[0_16px_40px_rgba(0,0,0,0.65)] flex flex-col transition-colors duration-150"
         style={{
           backgroundColor: activeTheme.frameBg,
           borderColor: activeTheme.frameBorder,
         }}
       >
-        {/* Top File Coordinates (a-h) */}
+        {/* Top Coordinates (files at 0°/180°, ranks at 90°/270°) */}
         {showOutsideCoords && (
-          <div className="grid grid-cols-8 mb-1 px-5 h-4 items-center shrink-0">
-            {colIndices.map((c) => (
+          <div
+            data-testid="board-coords-top"
+            className="grid grid-cols-8 mb-1 px-5 h-4 items-center shrink-0"
+          >
+            {edgeLabels.top.map((label, idx) => (
               <div
-                key={`top-file-${FILES[c]}`}
+                key={`top-coord-${idx}-${label}`}
                 className="text-center text-[11px] font-mono font-semibold uppercase tracking-wider leading-none"
                 style={{ color: activeTheme.coordOuterText }}
                 aria-hidden="true"
               >
-                {FILES[c]}
+                {label}
               </div>
             ))}
           </div>
         )}
 
         <div className="flex items-stretch">
-          {/* Left Rank Coordinates (1-8) — Always height-synced with 8x8 grid */}
+          {/* Left Coordinates (ranks at 0°/180°, files at 90°/270°) — Always height-synced with 8x8 grid */}
           {showOutsideCoords && (
             <div
+              data-testid="board-coords-left"
               className={`flex flex-col justify-around mr-1.5 w-3.5 shrink-0 ${fallbackRankHeightClass}`}
               style={rankColumnStyle}
             >
-              {rowIndices.map((r) => (
+              {edgeLabels.left.map((label, idx) => (
                 <div
-                  key={`left-rank-${RANKS[r]}`}
-                  className="text-center text-[11px] font-mono font-semibold leading-none"
+                  key={`left-coord-${idx}-${label}`}
+                  className="text-center text-[11px] font-mono font-semibold uppercase leading-none"
                   style={{ color: activeTheme.coordOuterText }}
                   aria-hidden="true"
                 >
-                  {RANKS[r]}
+                  {label}
                 </div>
               ))}
             </div>
@@ -662,11 +667,16 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
           >
             <div
               role="grid"
-              aria-label="Chessboard"
+              aria-label={`Chessboard (${describeBoardRotation(effectiveRotation)})`}
               className="grid grid-cols-8 grid-rows-8 w-full h-full"
             >
-              {rowIndices.map((r) =>
-                colIndices.map((c) => {
+              {visualIndices.map((visualRow) =>
+                visualIndices.map((visualCol) => {
+                  const { row: r, col: c } = visualToBoardCoords(
+                    visualRow,
+                    visualCol,
+                    effectiveRotation
+                  );
                   const square = coordsToSquare(r, c);
                   const isLight = (r + c) % 2 === 0;
                   const piece = gameState.board[r][c];
@@ -689,7 +699,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                       ? slidingMove.rookFrom ?? null
                       : null;
                   const slideOffset = slideFromSquare
-                    ? computeSlideOffset(slideFromSquare, square, isFlipped)
+                    ? computeSlideOffset(
+                        slideFromSquare,
+                        square,
+                        effectiveRotation
+                      )
                     : null;
 
                   // Helper Mode Threat & Recommendation state for this square (when Board Suggestions ON)
@@ -878,7 +892,11 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                           {(threatInfo.level === 'critical' ||
                             threatInfo.level === 'high') && (
                             <span
-                              className={`absolute top-0.5 right-0.5 px-1 py-0 text-[8px] font-mono font-bold uppercase leading-tight rounded-xs ${
+                              className={`absolute top-0.5 right-0.5 py-0 font-mono font-bold uppercase leading-tight rounded-xs max-w-[calc(100%-2px)] truncate ${
+                                isCompactBoard
+                                  ? 'px-0.5 text-[6px] tracking-tight'
+                                  : 'px-1 text-[8px]'
+                              } ${
                                 threatInfo.level === 'critical'
                                   ? 'bg-[#DC2626] text-white'
                                   : 'bg-[#EA580C] text-white'
@@ -957,8 +975,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                         <div className="absolute inset-0 pointer-events-none ring-4 ring-inset ring-[#15803D]" />
                       )}
 
-                      {/* Corner Rank/File Micro-notations on edge squares */}
-                      {showInsideCoords && c === colIndices[0] && (
+                      {/* Corner Rank/File Micro-notations on visual edge squares */}
+                      {showInsideCoords && visualCol === 0 && (
                         <span
                           aria-hidden="true"
                           className={`absolute top-0.5 left-1 font-mono font-bold leading-none pointer-events-none ${
@@ -970,10 +988,10 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                               : activeTheme.coordOnDark,
                           }}
                         >
-                          {RANKS[r]}
+                          {edgeLabels.left[visualRow]}
                         </span>
                       )}
-                      {showInsideCoords && r === rowIndices[7] && (
+                      {showInsideCoords && visualRow === 7 && (
                         <span
                           aria-hidden="true"
                           className={`absolute bottom-0.5 right-1 font-mono font-bold leading-none pointer-events-none ${
@@ -985,7 +1003,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                               : activeTheme.coordOnDark,
                           }}
                         >
-                          {FILES[c]}
+                          {edgeLabels.bottom[visualCol]}
                         </span>
                       )}
 
@@ -1440,37 +1458,41 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
             )}
           </div>
 
-          {/* Right Rank Coordinates (1-8) — Always height-synced with 8x8 grid */}
+          {/* Right Coordinates (ranks at 0°/180°, files at 90°/270°) — Always height-synced with 8x8 grid */}
           {showOutsideCoords && (
             <div
+              data-testid="board-coords-right"
               className={`flex flex-col justify-around ml-1.5 w-3.5 shrink-0 ${fallbackRankHeightClass}`}
               style={rankColumnStyle}
             >
-              {rowIndices.map((r) => (
+              {edgeLabels.right.map((label, idx) => (
                 <div
-                  key={`right-rank-${RANKS[r]}`}
-                  className="text-center text-[11px] font-mono font-semibold leading-none"
+                  key={`right-coord-${idx}-${label}`}
+                  className="text-center text-[11px] font-mono font-semibold uppercase leading-none"
                   style={{ color: activeTheme.coordOuterText }}
                   aria-hidden="true"
                 >
-                  {RANKS[r]}
+                  {label}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Bottom File Coordinates (a-h) */}
+        {/* Bottom Coordinates (files at 0°/180°, ranks at 90°/270°) */}
         {showOutsideCoords && (
-          <div className="grid grid-cols-8 mt-1 px-5 h-4 items-center shrink-0">
-            {colIndices.map((c) => (
+          <div
+            data-testid="board-coords-bottom"
+            className="grid grid-cols-8 mt-1 px-5 h-4 items-center shrink-0"
+          >
+            {edgeLabels.bottom.map((label, idx) => (
               <div
-                key={`bottom-file-${FILES[c]}`}
+                key={`bottom-coord-${idx}-${label}`}
                 className="text-center text-[11px] font-mono font-semibold uppercase tracking-wider leading-none"
                 style={{ color: activeTheme.coordOuterText }}
                 aria-hidden="true"
               >
-                {FILES[c]}
+                {label}
               </div>
             ))}
           </div>

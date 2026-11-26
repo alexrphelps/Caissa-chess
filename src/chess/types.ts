@@ -172,7 +172,7 @@ export interface AISearchResult {
   config?: ChessEngineConfig;
 }
 
-export type ShellState = 'title' | 'playing' | 'paused' | 'gameover' | 'puzzles' | 'replay';
+export type ShellState = 'title' | 'playing' | 'paused' | 'gameover' | 'puzzles' | 'replay' | 'journey';
 
 export interface MoveRecord {
   move: Move;
@@ -200,6 +200,16 @@ export interface GameState {
   zobristHash?: bigint;
 }
 
+export interface RatedSessionMetadata {
+  opponentElo: number;
+  undosAllowed: number;
+  undosRemaining: number;
+  undosUsed: number;
+  isFinalized?: boolean;
+}
+
+export type BoardRotation = 0 | 90 | 180 | 270;
+
 export interface StoredGameSession {
   id: string;
   title: string;
@@ -208,6 +218,7 @@ export interface StoredGameSession {
   gameMode: GameMode;
   playerColor: Color;
   isFlipped: boolean;
+  boardRotation?: BoardRotation;
   engineProfile: EngineProfileState;
   stateStack: GameState[];
   fen: string;
@@ -218,4 +229,5 @@ export interface StoredGameSession {
   winner: Color | 'draw' | null;
   lastMoveSan: string | null;
   isAutoSave?: boolean;
+  ratedJourney?: RatedSessionMetadata;
 }

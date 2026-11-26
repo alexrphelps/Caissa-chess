@@ -14,6 +14,7 @@ import {
   Pause,
   Play,
   RotateCcw,
+  RotateCw,
   SkipBack,
   SkipForward,
   SlidersHorizontal,
@@ -56,6 +57,7 @@ import { sortCapturedPieces } from '../chess/replayCoach';
 import { gameStateToFen } from '../chess/sessionStorage';
 import { RecommendedMove } from '../chess/tacticsHelper';
 import {
+  BoardRotation,
   Color,
   EngineProfileState,
   GameState,
@@ -64,6 +66,11 @@ import {
   PromotionPieceType,
   Square,
 } from '../chess/types';
+import {
+  flipBoardRotation,
+  rotateBoardCCW,
+  rotateBoardCW,
+} from '../utils/boardOrientation';
 import {
   computeBoardGridSize,
   DEFAULT_UI_LAYOUT_PREFERENCES,
@@ -143,7 +150,8 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
   );
   const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(false);
   const [speedMs, setSpeedMs] = useState<number>(1200);
-  const [isFlipped, setIsFlipped] = useState<boolean>(false);
+  const [boardRotation, setBoardRotation] = useState<BoardRotation>(0);
+  const isFlipped = boardRotation === 180;
   const [branchChoiceForPly, setBranchChoiceForPly] = useState<{
     ply: number;
     choice: BranchPlayChoice;
@@ -212,7 +220,7 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
     const clamped = Math.max(0, Math.min(initialPly, game.timeline.length - 1));
     setCurrentPly(clamped);
     setIsAutoPlaying(false);
-    setIsFlipped(false);
+    setBoardRotation(0);
     setBranchChoiceForPly(null);
     setPlannedArrows([]);
     setSideline(null);
@@ -907,7 +915,11 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
         e.preventDefault();
         toggleAutoPlay();
       } else if (e.key === 'f' || e.key === 'F') {
-        setIsFlipped((prev) => !prev);
+        setBoardRotation((prev) => flipBoardRotation(prev));
+      } else if (e.key === 't' || e.key === 'T') {
+        setBoardRotation((prev) =>
+          e.shiftKey ? rotateBoardCCW(prev) : rotateBoardCW(prev)
+        );
       }
     };
 
@@ -1028,16 +1040,26 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
     [activeBoardState.board]
   );
 
-  const topColor: Color = isFlipped ? 'w' : 'b';
-  const bottomColor: Color = isFlipped ? 'b' : 'w';
+  const topColor: Color = boardRotation === 180 ? 'w' : 'b';
+  const bottomColor: Color = boardRotation === 180 ? 'b' : 'w';
 
   const getPlayerMeta = (color: Color) => {
     const rawCaptured =
       color === 'w'
         ? activeBoardState.capturedByWhite
         : activeBoardState.capturedByBlack;
+    const sideLabel =
+      boardRotation === 90
+        ? color === 'w'
+          ? ' (Left)'
+          : ' (Right)'
+        : boardRotation === 270
+        ? color === 'w'
+          ? ' (Right)'
+          : ' (Left)'
+        : '';
     return {
-      name: color === 'w' ? game.headers.White : game.headers.Black,
+      name: `${color === 'w' ? game.headers.White : game.headers.Black}${sideLabel}`,
       elo: color === 'w' ? game.headers.WhiteElo : game.headers.BlackElo,
       clock: latestClocks[color],
       captured: sortCapturedPieces(rawCaptured),
@@ -1340,6 +1362,7 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
                 formattedScore={liveEval.formatted}
                 heightPx={boardGeometry.frameHeightPx}
                 isFlipped={isFlipped}
+                boardRotation={boardRotation}
                 isLoading={isAnalyzingPly}
               />
             )}
@@ -1350,6 +1373,7 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
               selectedSquare={selectedSquare}
               pendingPromotion={pendingPromotion}
               isFlipped={isFlipped}
+              boardRotation={boardRotation}
               isInteractionDisabled={isTerminalPosition}
               helperMode={false}
               showBoardSuggestions={false}
@@ -1618,10 +1642,27 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
 
                 <button
                   type="button"
+                  data-testid="replay-btn-rotate"
+                  aria-label="Rotate board 90 degrees clockwise"
+                  title={`Rotate Board +90° (T) · Currently ${boardRotation}°`}
+                  onClick={() => setBoardRotation((prev) => rotateBoardCW(prev))}
+                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                    boardRotation === 90 || boardRotation === 270
+                      ? 'bg-[#252014] hover:bg-[#332C1A] border-[#C6923A] text-[#C6923A]'
+                      : 'bg-[#212E27] hover:bg-[#2C3D34] border-[#34463C] text-[#EADBC8]'
+                  }`}
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
                   data-testid="replay-btn-flip"
                   aria-label="Flip board perspective"
-                  title="Flip Board (F)"
-                  onClick={() => setIsFlipped((prev) => !prev)}
+                  title="Flip Board 180° (F)"
+                  onClick={() =>
+                    setBoardRotation((prev) => flipBoardRotation(prev))
+                  }
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-[#212E27] hover:bg-[#2C3D34] border border-[#34463C] text-[#EADBC8] flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 >
                   <FlipVertical2 className="w-3.5 h-3.5" />

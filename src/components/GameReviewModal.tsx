@@ -21,6 +21,7 @@ interface GameReviewModalProps {
   onSelectPreviewPly: (ply: number) => void;
   onStartRetryBlunder: (turningPoint: TurningPoint) => void;
   onPlayAgain: () => void;
+  playAgainLabel?: string;
   onOpenInReplay?: () => void;
 }
 
@@ -35,6 +36,7 @@ export const GameReviewModal: React.FC<GameReviewModalProps> = ({
   onSelectPreviewPly,
   onStartRetryBlunder,
   onPlayAgain,
+  playAgainLabel = 'Play Again',
   onOpenInReplay,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'graph' | 'turning_points'>('overview');
@@ -472,10 +474,11 @@ export const GameReviewModal: React.FC<GameReviewModalProps> = ({
             </button>
             <button
               type="button"
+              data-testid="review-play-again-btn"
               onClick={onPlayAgain}
-              className="py-1.5 px-4 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] text-[#111815] text-xs font-bold transition-colors cursor-pointer"
+              className="py-1.5 px-4 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] text-[#111815] text-xs font-bold transition-colors cursor-pointer whitespace-nowrap"
             >
-              Play Again
+              {playAgainLabel}
             </button>
           </div>
         </div>

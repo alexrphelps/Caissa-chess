@@ -1,10 +1,13 @@
 import React from 'react';
 import { computeEvalBarMetrics } from '../chess/replayCoach';
+import { BoardRotation } from '../chess/types';
+import { resolveBoardRotation } from '../utils/boardOrientation';
 
 interface EvalBarProps {
   evalWhiteCp: number;
   heightPx: number;
   isFlipped: boolean;
+  boardRotation?: BoardRotation;
   formattedScore?: string;
   isLoading?: boolean;
   className?: string;
@@ -18,6 +21,7 @@ export const EvalBar: React.FC<EvalBarProps> = ({
   evalWhiteCp,
   heightPx,
   isFlipped,
+  boardRotation,
   formattedScore,
   isLoading = false,
   className = '',
@@ -25,9 +29,10 @@ export const EvalBar: React.FC<EvalBarProps> = ({
   const metrics = computeEvalBarMetrics(evalWhiteCp);
   const displayLabel = formattedScore ?? metrics.label;
   const whiteWinning = metrics.whiteLeading;
+  const effectiveRotation = resolveBoardRotation(boardRotation, isFlipped);
 
-  // Determine where White's fill is anchored (bottom normally, top when board is flipped)
-  const whiteOnBottom = !isFlipped;
+  // Anchor White's fill on bottom for 0°/90° and on top for 180°/270°
+  const whiteOnBottom = effectiveRotation === 0 || effectiveRotation === 90;
   const labelAtBottom = whiteWinning ? whiteOnBottom : !whiteOnBottom;
 
   // Compact display string so it fits inside a 26px-wide column cleanly

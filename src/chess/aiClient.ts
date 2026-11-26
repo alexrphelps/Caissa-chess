@@ -9,11 +9,21 @@ import { ReplayPlyCoachInsight, TimelineNode } from './pgnTypes';
 import { analyzeReplayPly } from './replayCoach';
 import { analyzeTacticsDeep, TacticsAnalysis } from './tacticsHelper';
 import {
+  calibrateFromSavedSessions,
+  SavedGamesCalibrationProgress,
+  SavedGamesCalibrationResult,
+  ScoredPlayerPly,
+  scoreMissingPlayerPlies,
+  scoreSinglePlayerPly,
+} from './ratedJourney';
+import {
   AIDifficulty,
   AISearchResult,
   ChessEngineConfig,
   CoachPlaystyleProfile,
+  Color,
   GameState,
+  StoredGameSession,
 } from './types';
 
 let workerInstance: Worker | null = null;
@@ -50,6 +60,32 @@ const pendingFullReviewResolvers = new Map<
     resolve: (res: GameReviewReport) => void;
     reject: (err: unknown) => void;
     onProgress?: (progress: GameReviewProgressEvent) => void;
+  }
+>();
+
+const pendingRatedPlyResolvers = new Map<
+  number,
+  {
+    resolve: (res: ScoredPlayerPly) => void;
+    reject: (err: unknown) => void;
+  }
+>();
+
+const pendingRemainingRatedPliesResolvers = new Map<
+  number,
+  {
+    resolve: (res: ScoredPlayerPly[]) => void;
+    reject: (err: unknown) => void;
+    onProgress?: (completed: number, total: number) => void;
+  }
+>();
+
+const pendingCalibrationResolvers = new Map<
+  number,
+  {
+    resolve: (res: SavedGamesCalibrationResult) => void;
+    reject: (err: unknown) => void;
+    onProgress?: (progress: SavedGamesCalibrationProgress) => void;
   }
 >();
 
@@ -98,6 +134,44 @@ function getOrCreateWorker(): Worker | null {
           }
           return;
         }
+        if (msg.type === 'score_rated_ply') {
+          const pending = pendingRatedPlyResolvers.get(msg.requestId);
+          if (pending) {
+            pendingRatedPlyResolvers.delete(msg.requestId);
+            pending.resolve(msg.scoredPly);
+          }
+          return;
+        }
+        if (msg.type === 'score_remaining_rated_plies_progress') {
+          const pending = pendingRemainingRatedPliesResolvers.get(msg.requestId);
+          if (pending?.onProgress) {
+            pending.onProgress(msg.completed, msg.total);
+          }
+          return;
+        }
+        if (msg.type === 'score_remaining_rated_plies') {
+          const pending = pendingRemainingRatedPliesResolvers.get(msg.requestId);
+          if (pending) {
+            pendingRemainingRatedPliesResolvers.delete(msg.requestId);
+            pending.resolve(msg.scoredPlies);
+          }
+          return;
+        }
+        if (msg.type === 'calibrate_saved_games_progress') {
+          const pending = pendingCalibrationResolvers.get(msg.requestId);
+          if (pending?.onProgress) {
+            pending.onProgress(msg.progress);
+          }
+          return;
+        }
+        if (msg.type === 'calibrate_saved_games') {
+          const pending = pendingCalibrationResolvers.get(msg.requestId);
+          if (pending) {
+            pendingCalibrationResolvers.delete(msg.requestId);
+            pending.resolve(msg.result);
+          }
+          return;
+        }
 
         const pending = pendingMoveResolvers.get(msg.requestId);
         if (pending) {
@@ -119,10 +193,22 @@ function getOrCreateWorker(): Worker | null {
         for (const [, pending] of pendingFullReviewResolvers) {
           pending.reject(err);
         }
+        for (const [, pending] of pendingRatedPlyResolvers) {
+          pending.reject(err);
+        }
+        for (const [, pending] of pendingRemainingRatedPliesResolvers) {
+          pending.reject(err);
+        }
+        for (const [, pending] of pendingCalibrationResolvers) {
+          pending.reject(err);
+        }
         pendingMoveResolvers.clear();
         pendingCoachResolvers.clear();
         pendingReplayPlyResolvers.clear();
         pendingFullReviewResolvers.clear();
+        pendingRatedPlyResolvers.clear();
+        pendingRemainingRatedPliesResolvers.clear();
+        pendingCalibrationResolvers.clear();
         workerInstance?.terminate();
         workerInstance = null;
       };
@@ -516,4 +602,221 @@ export async function computeFullGameReviewAsync(
     worker.postMessage(payload);
   });
 }
+
+/**
+ * Silently scores a single player move in the background Web Worker during a Rated Journey game.
+ */
+export async function scoreRatedPlyAsync(
+  stateBefore: GameState,
+  stateAfter: GameState,
+  plyIndex: number,
+  signal?: AbortSignal
+): Promise<ScoredPlayerPly | null> {
+  if (signal?.aborted) return null;
+
+  return new Promise<ScoredPlayerPly | null>((resolve) => {
+    const worker = getOrCreateWorker();
+    if (!worker) {
+      const timer = window.setTimeout(() => {
+        if (signal?.aborted) {
+          resolve(null);
+          return;
+        }
+        resolve(scoreSinglePlayerPly(stateBefore, stateAfter, plyIndex));
+      }, 24);
+      signal?.addEventListener(
+        'abort',
+        () => {
+          window.clearTimeout(timer);
+          resolve(null);
+        },
+        { once: true }
+      );
+      return;
+    }
+
+    const requestId = nextRequestId++;
+    const abortHandler = () => {
+      pendingRatedPlyResolvers.delete(requestId);
+      resolve(null);
+    };
+    signal?.addEventListener('abort', abortHandler, { once: true });
+
+    pendingRatedPlyResolvers.set(requestId, {
+      resolve: (scored) => {
+        signal?.removeEventListener('abort', abortHandler);
+        resolve(signal?.aborted ? null : scored);
+      },
+      reject: () => {
+        signal?.removeEventListener('abort', abortHandler);
+        resolve(
+          signal?.aborted
+            ? null
+            : scoreSinglePlayerPly(stateBefore, stateAfter, plyIndex)
+        );
+      },
+    });
+
+    worker.postMessage({
+      type: 'score_rated_ply',
+      requestId,
+      stateBefore,
+      stateAfter,
+      plyIndex,
+    } satisfies AIWorkerRequest);
+  });
+}
+
+/**
+ * Scores any remaining unscored player plies on Rated Journey match completion.
+ */
+export async function scoreRemainingRatedPliesAsync(
+  stateStack: GameState[],
+  playerColor: Color,
+  existingScores: Record<number, ScoredPlayerPly>,
+  options?: {
+    signal?: AbortSignal;
+    onProgress?: (completed: number, total: number) => void;
+  }
+): Promise<ScoredPlayerPly[] | null> {
+  const signal = options?.signal;
+  const onProgress = options?.onProgress;
+  if (signal?.aborted) return null;
+
+  return new Promise<ScoredPlayerPly[] | null>((resolve) => {
+    const worker = getOrCreateWorker();
+    if (!worker) {
+      const timer = window.setTimeout(() => {
+        if (signal?.aborted) {
+          resolve(null);
+          return;
+        }
+        resolve(
+          scoreMissingPlayerPlies(
+            stateStack,
+            playerColor,
+            existingScores,
+            onProgress
+          )
+        );
+      }, 20);
+      signal?.addEventListener(
+        'abort',
+        () => {
+          window.clearTimeout(timer);
+          resolve(null);
+        },
+        { once: true }
+      );
+      return;
+    }
+
+    const requestId = nextRequestId++;
+    const abortHandler = () => {
+      pendingRemainingRatedPliesResolvers.delete(requestId);
+      resolve(null);
+    };
+    signal?.addEventListener('abort', abortHandler, { once: true });
+
+    pendingRemainingRatedPliesResolvers.set(requestId, {
+      onProgress,
+      resolve: (plies) => {
+        signal?.removeEventListener('abort', abortHandler);
+        resolve(signal?.aborted ? null : plies);
+      },
+      reject: () => {
+        signal?.removeEventListener('abort', abortHandler);
+        resolve(
+          signal?.aborted
+            ? null
+            : scoreMissingPlayerPlies(
+                stateStack,
+                playerColor,
+                existingScores,
+                onProgress
+              )
+        );
+      },
+    });
+
+    worker.postMessage({
+      type: 'score_remaining_rated_plies',
+      requestId,
+      stateStack,
+      playerColor,
+      existingScores,
+    } satisfies AIWorkerRequest);
+  });
+}
+
+/**
+ * Scans saved AI games asynchronously in the Web Worker to estimate an initial Rated Journey tier.
+ */
+export async function calibrateSavedGamesAsync(
+  sessions: StoredGameSession[],
+  puzzleRatingPrior?: number | null,
+  options?: {
+    signal?: AbortSignal;
+    onProgress?: (progress: SavedGamesCalibrationProgress) => void;
+  }
+): Promise<SavedGamesCalibrationResult | null> {
+  const signal = options?.signal;
+  const onProgress = options?.onProgress;
+  if (signal?.aborted) return null;
+
+  return new Promise<SavedGamesCalibrationResult | null>((resolve) => {
+    const worker = getOrCreateWorker();
+    if (!worker) {
+      const timer = window.setTimeout(() => {
+        if (signal?.aborted) {
+          resolve(null);
+          return;
+        }
+        resolve(
+          calibrateFromSavedSessions(sessions, puzzleRatingPrior, onProgress)
+        );
+      }, 24);
+      signal?.addEventListener(
+        'abort',
+        () => {
+          window.clearTimeout(timer);
+          resolve(null);
+        },
+        { once: true }
+      );
+      return;
+    }
+
+    const requestId = nextRequestId++;
+    const abortHandler = () => {
+      pendingCalibrationResolvers.delete(requestId);
+      resolve(null);
+    };
+    signal?.addEventListener('abort', abortHandler, { once: true });
+
+    pendingCalibrationResolvers.set(requestId, {
+      onProgress,
+      resolve: (res) => {
+        signal?.removeEventListener('abort', abortHandler);
+        resolve(signal?.aborted ? null : res);
+      },
+      reject: () => {
+        signal?.removeEventListener('abort', abortHandler);
+        resolve(
+          signal?.aborted
+            ? null
+            : calibrateFromSavedSessions(sessions, puzzleRatingPrior, onProgress)
+        );
+      },
+    });
+
+    worker.postMessage({
+      type: 'calibrate_saved_games',
+      requestId,
+      sessions,
+      puzzleRatingPrior,
+    } satisfies AIWorkerRequest);
+  });
+}
+
 
