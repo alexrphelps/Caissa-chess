@@ -31,6 +31,7 @@ interface SavedGamesModalProps {
   onRenameSession: (id: string, newTitle: string) => void;
   onClearActiveSession?: () => void;
   onImportSession?: (session: StoredGameSession) => void;
+  onOpenInReplay?: (session: StoredGameSession) => void;
 }
 
 export const SavedGamesModal: React.FC<SavedGamesModalProps> = ({
@@ -49,6 +50,7 @@ export const SavedGamesModal: React.FC<SavedGamesModalProps> = ({
   onRenameSession,
   onClearActiveSession,
   onImportSession,
+  onOpenInReplay,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState<string>('');
@@ -347,13 +349,26 @@ export const SavedGamesModal: React.FC<SavedGamesModalProps> = ({
                     Discard
                   </button>
                 )}
+                {onOpenInReplay && (
+                  <button
+                    type="button"
+                    data-testid="replay-active-session-btn"
+                    onClick={() => {
+                      onOpenInReplay(activeSession);
+                      onClose();
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-[#212E27] hover:bg-[#2C3D34] border border-[#C6923A]/60 text-xs font-semibold text-[#EADBC8] hover:text-[#F4EFE6] transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    Replay
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
                     onLoadSession(activeSession);
                     onClose();
                   }}
-                  className="flex-1 sm:flex-initial px-4 py-1.5 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] text-xs font-bold text-[#111815] transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-initial px-4 py-1.5 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] text-xs font-bold text-[#111815] transition-colors cursor-pointer whitespace-nowrap"
                 >
                   Resume Active Match
                 </button>
@@ -536,18 +551,33 @@ export const SavedGamesModal: React.FC<SavedGamesModalProps> = ({
                           </button>
                         </div>
 
-                        <button
-                          type="button"
-                          data-testid={`load-session-${session.id}`}
-                          onClick={() => {
-                            onLoadSession(session);
-                            onClose();
-                          }}
-                          className="px-4 py-1.5 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] active:bg-[#B5822D] text-[#111815] font-bold text-xs transition-colors cursor-pointer shadow-xs flex items-center gap-1"
-                        >
-                          <span>Load Game</span>
-                          <span>→</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {onOpenInReplay && (
+                            <button
+                              type="button"
+                              data-testid={`replay-session-${session.id}`}
+                              onClick={() => {
+                                onOpenInReplay(session);
+                                onClose();
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-[#212E27] hover:bg-[#2C3D34] border border-[#C6923A]/60 text-xs font-semibold text-[#EADBC8] hover:text-[#F4EFE6] transition-colors cursor-pointer whitespace-nowrap"
+                            >
+                              Open in Replay
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            data-testid={`load-session-${session.id}`}
+                            onClick={() => {
+                              onLoadSession(session);
+                              onClose();
+                            }}
+                            className="px-4 py-1.5 rounded-lg bg-[#C6923A] hover:bg-[#D4A048] active:bg-[#B5822D] text-[#111815] font-bold text-xs transition-colors cursor-pointer shadow-xs flex items-center gap-1 whitespace-nowrap"
+                          >
+                            <span>Load Game</span>
+                            <span>→</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

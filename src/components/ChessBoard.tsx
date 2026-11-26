@@ -156,6 +156,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   const boardGridRef = useRef<HTMLDivElement | null>(null);
   const ghostPieceRef = useRef<HTMLDivElement | null>(null);
   const suppressNextClickRef = useRef<boolean>(false);
+  const clearedAnnotationsOnPointerDownRef = useRef<boolean>(false);
   const resizeDragRef = useRef<{
     startX: number;
     startY: number;
@@ -217,17 +218,23 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
     new Set()
   );
 
-  // Track forward moves to trigger smooth sliding piece animation
+  // Track position signature so ply jumps, game switches, and sidelines clear all transient highlights
+  const positionSignature = `${gameState.moveHistory.length}|${
+    gameState.lastMove?.from ?? ''
+  }-${gameState.lastMove?.to ?? ''}|${gameState.turn}|${gameState.fullMoveNumber}`;
+  const [lastSeenPosSig, setLastSeenPosSig] = useState<string>(positionSignature);
   const [lastSeenMoveCount, setLastSeenMoveCount] = useState<number>(
     gameState.moveHistory.length
   );
   const [slidingMove, setSlidingMove] = useState<SlidingMoveState | null>(null);
 
-  if (gameState.moveHistory.length !== lastSeenMoveCount) {
+  if (positionSignature !== lastSeenPosSig) {
     const prevCount = lastSeenMoveCount;
+    setLastSeenPosSig(positionSignature);
     setLastSeenMoveCount(gameState.moveHistory.length);
     setRightClickOrigin(null);
     setRightDrag(null);
+    setHighlightedSquares(new Set());
     setHeldPiece(null);
     setDragOverSquare(null);
 
@@ -764,9 +771,16 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                         if (e.button !== 0 && e.pointerType === 'mouse') return;
 
                         // Left-clicking/tapping clears planned arrows and highlights
-                        onClearPlannedArrows();
-                        setHighlightedSquares(new Set());
-                        setRightClickOrigin(null);
+                        const hadAnnotations =
+                          plannedArrows.length > 0 ||
+                          highlightedSquares.size > 0 ||
+                          rightClickOrigin !== null;
+                        clearedAnnotationsOnPointerDownRef.current = hadAnnotations;
+                        if (hadAnnotations) {
+                          onClearPlannedArrows();
+                          setHighlightedSquares(new Set());
+                          setRightClickOrigin(null);
+                        }
 
                         if (canDragPiece && piece) {
                           e.preventDefault();
@@ -790,12 +804,26 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                           suppressNextClickRef.current = false;
                           return;
                         }
-                        onClearPlannedArrows();
-                        setHighlightedSquares(new Set());
-                        setRightClickOrigin(null);
+                        const clearedOnDown =
+                          clearedAnnotationsOnPointerDownRef.current;
+                        clearedAnnotationsOnPointerDownRef.current = false;
+                        const hadAnnotationsNow =
+                          plannedArrows.length > 0 ||
+                          highlightedSquares.size > 0 ||
+                          rightClickOrigin !== null;
+                        if (hadAnnotationsNow) {
+                          onClearPlannedArrows();
+                          setHighlightedSquares(new Set());
+                          setRightClickOrigin(null);
+                        }
                         if (!isInteractionDisabled) {
                           onSquareClick(square);
-                        } else if (onDisabledInteractionAttempt && piece) {
+                        } else if (
+                          !clearedOnDown &&
+                          !hadAnnotationsNow &&
+                          onDisabledInteractionAttempt &&
+                          piece
+                        ) {
                           onDisabledInteractionAttempt(square);
                         }
                       }}

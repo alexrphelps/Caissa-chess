@@ -166,11 +166,20 @@ function generateExplanation(
   }
 }
 
+export interface GameReviewProgressEvent {
+  completedPlies: number;
+  totalPlies: number;
+  evalCurve: number[];
+}
+
 /**
  * Performs a comprehensive post-game analysis on a full stateStack.
- * Can be run synchronously or wrapped in a Web Worker.
+ * Can be run synchronously or wrapped in a Web Worker with live progress streaming.
  */
-export function generateGameReview(stateStack: GameState[]): GameReviewReport {
+export function generateGameReview(
+  stateStack: GameState[],
+  onProgress?: (progress: GameReviewProgressEvent) => void
+): GameReviewReport {
   if (stateStack.length <= 1) {
     return {
       totalPlies: 0,
@@ -186,6 +195,7 @@ export function generateGameReview(stateStack: GameState[]): GameReviewReport {
     };
   }
 
+  const totalPliesToAnalyze = stateStack.length - 1;
   const plies: AnalyzedPlyReview[] = [];
   const evalCurve: number[] = [0];
   const whiteCpl: number[] = [];
@@ -196,7 +206,7 @@ export function generateGameReview(stateStack: GameState[]): GameReviewReport {
   };
   const turningPoints: TurningPoint[] = [];
 
-  for (let i = 0; i < stateStack.length - 1; i++) {
+  for (let i = 0; i < totalPliesToAnalyze; i++) {
     const stateBefore = stateStack[i];
     const stateAfter = stateStack[i + 1];
     const activeColor = stateBefore.turn;
@@ -208,11 +218,12 @@ export function generateGameReview(stateStack: GameState[]): GameReviewReport {
     const playedSan = lastRecord.san;
     const turnNumber = lastRecord.turnNumber;
 
-    // Search top moves in the position before the move with depth 2 + quiescence
+    // Search top moves in the position before the move with depth 3 + quiescence
     const searchRes = searchMultiPV(stateBefore, {
       multiPvCount: 3,
-      maxDepth: 2,
-      maxTimeMs: 120,
+      maxDepth: 3,
+      maxTimeMs: 90,
+      forCoach: true,
     });
     const topItem = searchRes.items[0];
 
@@ -234,7 +245,11 @@ export function generateGameReview(stateStack: GameState[]): GameReviewReport {
 
     // Calculate score of played move
     let playedScoreForTurn = bestScoreForTurn;
-    if (!isExactTop) {
+    if (stateAfter.status === 'checkmate') {
+      playedScoreForTurn = 100000;
+    } else if (stateAfter.status !== 'playing') {
+      playedScoreForTurn = 0;
+    } else if (!isExactTop) {
       const matchInPv = searchRes.items.find(
         (it) =>
           it.move.from === playedMove.from &&
@@ -245,13 +260,25 @@ export function generateGameReview(stateStack: GameState[]): GameReviewReport {
       if (matchInPv) {
         playedScoreForTurn = matchInPv.scoreForTurn;
       } else {
-        // Fallback: evaluate resulting board
-        const whitePerspective = evaluateBoardWhitePerspective(
-          stateAfter.board,
-          'club'
-        );
-        playedScoreForTurn =
-          activeColor === 'w' ? whitePerspective : -whitePerspective;
+        // Quick tactical search after the played move so sacrifices & tactics aren't misread by raw material
+        const afterSearch = searchMultiPV(stateAfter, {
+          multiPvCount: 1,
+          maxDepth: 2,
+          maxTimeMs: 45,
+          forCoach: true,
+        });
+        const oppBest = afterSearch.items[0];
+        if (oppBest) {
+          playedScoreForTurn =
+            activeColor === 'w' ? oppBest.whiteScore : -oppBest.whiteScore;
+        } else {
+          const whitePerspective = evaluateBoardWhitePerspective(
+            stateAfter.board,
+            'club'
+          );
+          playedScoreForTurn =
+            activeColor === 'w' ? whitePerspective : -whitePerspective;
+        }
       }
     }
 
@@ -318,6 +345,14 @@ export function generateGameReview(stateStack: GameState[]): GameReviewReport {
         classification,
         title: `${activeColor === 'w' ? 'White' : 'Black'} ${CLASSIFICATION_COLORS[classification].label} on Move ${turnNumber}`,
         description: explanation,
+      });
+    }
+
+    if (onProgress && ((i + 1) % 2 === 0 || i + 1 === totalPliesToAnalyze)) {
+      onProgress({
+        completedPlies: i + 1,
+        totalPlies: totalPliesToAnalyze,
+        evalCurve: [...evalCurve],
       });
     }
   }

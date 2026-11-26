@@ -21,6 +21,7 @@ interface GameReviewModalProps {
   onSelectPreviewPly: (ply: number) => void;
   onStartRetryBlunder: (turningPoint: TurningPoint) => void;
   onPlayAgain: () => void;
+  onOpenInReplay?: () => void;
 }
 
 export const GameReviewModal: React.FC<GameReviewModalProps> = ({
@@ -34,6 +35,7 @@ export const GameReviewModal: React.FC<GameReviewModalProps> = ({
   onSelectPreviewPly,
   onStartRetryBlunder,
   onPlayAgain,
+  onOpenInReplay,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'graph' | 'turning_points'>('overview');
   const [copiedType, setCopiedType] = useState<'pgn' | 'fen' | null>(null);
@@ -448,6 +450,19 @@ export const GameReviewModal: React.FC<GameReviewModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {onOpenInReplay && (
+              <button
+                type="button"
+                data-testid="review-open-replay-btn"
+                onClick={() => {
+                  onClose();
+                  onOpenInReplay();
+                }}
+                className="py-1.5 px-3.5 rounded-lg bg-[#212E27] hover:bg-[#2B3B32] border border-[#C6923A]/60 text-xs font-semibold text-[#EADBC8] hover:text-[#F4EFE6] transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Open in Replay Studio
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}

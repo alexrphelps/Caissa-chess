@@ -13,6 +13,7 @@ interface StatusModalProps {
   onInspectBoard: () => void;
   onOpenSavedGames?: () => void;
   onOpenGameReview?: () => void;
+  onOpenInReplay?: () => void;
 }
 
 export const StatusModal: React.FC<StatusModalProps> = ({
@@ -26,6 +27,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({
   onInspectBoard,
   onOpenSavedGames,
   onOpenGameReview,
+  onOpenInReplay,
 }) => {
   if (shellState !== 'paused' && shellState !== 'gameover') {
     return null;
@@ -247,6 +249,16 @@ export const StatusModal: React.FC<StatusModalProps> = ({
             >
               <span>📊</span>
               <span>Review Match & Accuracies</span>
+            </button>
+          )}
+          {onOpenInReplay && (
+            <button
+              type="button"
+              data-testid="gameover-open-replay-btn"
+              onClick={onOpenInReplay}
+              className="w-full py-2.5 px-4 rounded-lg bg-[#1D2922] hover:bg-[#25352C] border border-[#C6923A]/60 text-xs font-semibold text-[#F4EFE6] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>Open in Replay Studio</span>
             </button>
           )}
           {onOpenSavedGames && (

@@ -329,6 +329,35 @@ export const BoardCustomizerModal: React.FC<BoardCustomizerModalProps> = ({
                 {preferences.showBoardTooltip ? 'Shown' : 'Hidden'}
               </button>
             </div>
+
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <div>
+                <div className="text-xs font-semibold text-[#EADBC8]">
+                  Vertical Evaluation Bar
+                </div>
+                <div className="text-[11px] text-[#A69F91]">
+                  Live centipawn advantage meter beside the chessboard
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={preferences.showEvalBar}
+                data-testid="customizer-toggle-eval-bar-btn"
+                onClick={() =>
+                  onChangePreferences({
+                    showEvalBar: !preferences.showEvalBar,
+                  })
+                }
+                className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-bold border transition-colors cursor-pointer shrink-0 ${
+                  preferences.showEvalBar
+                    ? 'bg-[#16A34A]/20 border-[#22C55E] text-[#4ADE80]'
+                    : 'bg-[#1D2822] border-[#34463C] text-[#A69F91] hover:text-[#F4EFE6]'
+                }`}
+              >
+                {preferences.showEvalBar ? 'Shown' : 'Hidden'}
+              </button>
+            </div>
           </section>
         </div>
 

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   computeAIMoveWithCadence,
   computeDeepCoachAnalysis,
+  computeFullGameReviewAsync,
 } from './chess/aiClient';
 import {
   canUndoState,
@@ -21,6 +22,8 @@ import {
 import {
   createEngineProfileFromElo,
   createEngineProfileFromPreset,
+  evaluateBoardWhitePerspective,
+  formatEvalScore,
   mapEloToLegacyDifficulty,
   resolveEngineConfig,
 } from './chess/evaluation';
@@ -58,7 +61,6 @@ import {
 } from './chess/openingAssistant';
 import {
   GameReviewReport,
-  generateGameReview,
   TurningPoint,
 } from './chess/gameReview';
 import {
@@ -83,6 +85,8 @@ import {
 } from './chess/types';
 import {
   buildStateStackUpToPly,
+  convertSessionToParsedPgnGame,
+  convertStateStackToParsedPgnGame,
   formatPgnGameSummary,
 } from './chess/pgnParser';
 import {
@@ -93,6 +97,7 @@ import {
 import { BoardCustomizerModal } from './components/BoardCustomizerModal';
 import { ChessBoard } from './components/ChessBoard';
 import { EngineCustomizerModal } from './components/EngineCustomizerModal';
+import { EvalBar } from './components/EvalBar';
 import { GameReviewModal } from './components/GameReviewModal';
 import {
   TacticalCoachPanel,
@@ -109,6 +114,7 @@ import {
   clampCoachPanelWidth,
   computeBoardGridSize,
   DEFAULT_UI_LAYOUT_PREFERENCES,
+  EVAL_BAR_RESERVE_PX,
   loadUILayoutPreferences,
   MAX_COACH_WIDTH,
   MIN_COACH_WIDTH,
@@ -391,6 +397,7 @@ export default function App() {
       boardScale: uiPrefs.boardScale,
       coordinateStyle: uiPrefs.coordinateStyle,
       showHelperBox: uiPrefs.showBoardTooltip,
+      showEvalBar: uiPrefs.showEvalBar,
       underBoardStripHeight,
       isStackedLayout: !canUseDesktopSplit || !lockViewportHeight,
     });
@@ -402,6 +409,7 @@ export default function App() {
     uiPrefs.boardScale,
     uiPrefs.coordinateStyle,
     uiPrefs.showBoardTooltip,
+    uiPrefs.showEvalBar,
     canUseDesktopSplit,
     lockViewportHeight,
   ]);
@@ -795,16 +803,36 @@ export default function App() {
     }
   }, [stateStack, gameMode, playerColor, isFlipped, engineProfile, showToast]);
 
+  const gameReviewAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      gameReviewAbortRef.current?.abort();
+    };
+  }, []);
+
   const handleOpenGameReview = useCallback(() => {
     if (
-      !gameReviewReport ||
-      gameReviewReport.totalPlies !== stateStack.length - 1
+      gameReviewReport &&
+      gameReviewReport.totalPlies === stateStack.length - 1
     ) {
-      const report = generateGameReview(stateStack);
-      setGameReviewReport(report);
+      setIsGameReviewOpen(true);
+      return;
     }
-    setIsGameReviewOpen(true);
-  }, [gameReviewReport, stateStack]);
+
+    gameReviewAbortRef.current?.abort();
+    const controller = new AbortController();
+    gameReviewAbortRef.current = controller;
+    showToast('Analyzing match in background...');
+
+    computeFullGameReviewAsync(stateStack, {
+      signal: controller.signal,
+    }).then((report) => {
+      if (controller.signal.aborted || !report) return;
+      setGameReviewReport(report);
+      setIsGameReviewOpen(true);
+    });
+  }, [gameReviewReport, stateStack, showToast]);
 
   const handleStartRetryBlunder = useCallback(
     (turningPoint: TurningPoint) => {
@@ -1111,10 +1139,51 @@ export default function App() {
     [clearPendingTimers]
   );
 
+  const handleOpenSessionInReplay = useCallback(
+    (session: StoredGameSession) => {
+      const parsed = convertSessionToParsedPgnGame(session);
+      setReplayReturnShell(shellState === 'title' ? 'title' : 'playing');
+      handleSelectReplayGame(parsed, Math.max(0, parsed.timeline.length - 1));
+    },
+    [shellState, handleSelectReplayGame]
+  );
+
+  const handleOpenCurrentMatchInReplay = useCallback(() => {
+    const whiteName =
+      gameMode === 'ai'
+        ? playerColor === 'w'
+          ? 'You'
+          : `AI (${engineProfile.elo} Elo)`
+        : 'Player 1 (White)';
+    const blackName =
+      gameMode === 'ai'
+        ? playerColor === 'b'
+          ? 'You'
+          : `AI (${engineProfile.elo} Elo)`
+        : 'Player 2 (Black)';
+    const parsed = convertStateStackToParsedPgnGame({
+      stateStack,
+      gameMode,
+      playerColor,
+      engineProfile,
+      title: `${whiteName} vs. ${blackName}`,
+    });
+    setReplayReturnShell('playing');
+    handleSelectReplayGame(parsed, Math.max(0, parsed.timeline.length - 1));
+  }, [stateStack, gameMode, playerColor, engineProfile, handleSelectReplayGame]);
+
   const handleContinuePlayFromHere = useCallback(
-    (ply: number, choice: BranchPlayChoice, shouldFlip: boolean) => {
+    (
+      ply: number,
+      choice: BranchPlayChoice,
+      shouldFlip: boolean,
+      customStateStack?: GameState[]
+    ) => {
       if (!activeReplayGame) return;
-      const branchStack = buildStateStackUpToPly(activeReplayGame, ply);
+      const branchStack =
+        customStateStack && customStateStack.length > 0
+          ? customStateStack
+          : buildStateStackUpToPly(activeReplayGame, ply);
       if (branchStack.length === 0) return;
 
       const nextGameMode: GameMode =
@@ -1737,6 +1806,7 @@ export default function App() {
           onRenameSession={handleRenameSession}
           onClearActiveSession={handleClearActiveSession}
           onImportSession={handleImportSession}
+          onOpenInReplay={handleOpenSessionInReplay}
         />
       </>
     );
@@ -1843,59 +1913,87 @@ export default function App() {
             isDesktopSplit ? 'flex-1' : 'w-full shrink-0'
           }`}
         >
-          <ChessBoard
-            gameState={displayedGameState}
-            legalMoves={isPreviewingHistory ? [] : legalMoves}
-            selectedSquare={isPreviewingHistory ? null : selectedSquare}
-            pendingPromotion={pendingPromotion}
-            isFlipped={isFlipped}
-            isInteractionDisabled={isBoardLocked}
-            helperMode={isPreviewingHistory ? false : helperMode}
-            showBoardSuggestions={showBoardSuggestions}
-            isPreviewingHistory={isPreviewingHistory}
-            helperAnalysis={helperAnalysis}
-            highlightedHelperRank={highlightedHelperRank}
-            plannedArrows={plannedArrows}
-            hintPieceSquare={
-              retryBlunderSession?.hintRevealed
-                ? retryBlunderSession.turningPoint.bestMove.from
-                : null
-            }
-            hintDestSquare={
-              retryBlunderSession?.solved
-                ? retryBlunderSession.turningPoint.bestMove.to
-                : null
-            }
-            hintArrow={
-              retryBlunderSession?.solved
-                ? {
-                    from: retryBlunderSession.turningPoint.bestMove.from,
-                    to: retryBlunderSession.turningPoint.bestMove.to,
-                  }
-                : null
-            }
-            onSquareClick={handleSquareClick}
-            onMovePiece={(from, to) => {
-              if (!isBoardLocked) {
-                handleAttemptMove(from, to);
+          <div className="flex items-start justify-center gap-2 max-w-full">
+            {uiPrefs.showEvalBar && (() => {
+              let evalCp: number;
+              if (displayedGameState.status === 'checkmate') {
+                evalCp = displayedGameState.winner === 'w' ? 100000 : -100000;
+              } else if (
+                !isPreviewingHistory &&
+                helperAnalysis?.topMoves[0]
+              ) {
+                evalCp = helperAnalysis.topMoves[0].engineEval;
+              } else {
+                evalCp = evaluateBoardWhitePerspective(
+                  displayedGameState.board,
+                  'club'
+                );
               }
-            }}
-            onTogglePlannedArrow={handleTogglePlannedArrow}
-            onClearPlannedArrows={handleClearPlannedArrows}
-            onSelectPromotion={handleSelectPromotion}
-            onCancelPromotion={() => setPendingPromotion(null)}
-            hideHelperBox={!uiPrefs.showBoardTooltip}
-            boardSizePx={boardGeometry.boardSizePx}
-            maxFitSizePx={boardGeometry.maxFitSizePx}
-            boardTheme={uiPrefs.boardTheme}
-            coordinateStyle={uiPrefs.coordinateStyle}
-            boardScale={uiPrefs.boardScale}
-            isResizable={true}
-            onBoardScaleChange={(nextScale) =>
-              updateUiPrefs({ boardScale: nextScale }, true)
-            }
-            onResetBoardScale={() => updateUiPrefs({ boardScale: 1.0 }, true)}
-          />
+              return (
+                <EvalBar
+                  evalWhiteCp={evalCp}
+                  formattedScore={formatEvalScore(evalCp)}
+                  heightPx={boardGeometry.frameHeightPx}
+                  isFlipped={isFlipped}
+                  isLoading={isAIThinking}
+                />
+              );
+            })()}
+
+            <ChessBoard
+              gameState={displayedGameState}
+              legalMoves={isPreviewingHistory ? [] : legalMoves}
+              selectedSquare={isPreviewingHistory ? null : selectedSquare}
+              pendingPromotion={pendingPromotion}
+              isFlipped={isFlipped}
+              isInteractionDisabled={isBoardLocked}
+              helperMode={isPreviewingHistory ? false : helperMode}
+              showBoardSuggestions={showBoardSuggestions}
+              isPreviewingHistory={isPreviewingHistory}
+              helperAnalysis={helperAnalysis}
+              highlightedHelperRank={highlightedHelperRank}
+              plannedArrows={plannedArrows}
+              hintPieceSquare={
+                retryBlunderSession?.hintRevealed
+                  ? retryBlunderSession.turningPoint.bestMove.from
+                  : null
+              }
+              hintDestSquare={
+                retryBlunderSession?.solved
+                  ? retryBlunderSession.turningPoint.bestMove.to
+                  : null
+              }
+              hintArrow={
+                retryBlunderSession?.solved
+                  ? {
+                      from: retryBlunderSession.turningPoint.bestMove.from,
+                      to: retryBlunderSession.turningPoint.bestMove.to,
+                    }
+                  : null
+              }
+              onSquareClick={handleSquareClick}
+              onMovePiece={(from, to) => {
+                if (!isBoardLocked) {
+                  handleAttemptMove(from, to);
+                }
+              }}
+              onTogglePlannedArrow={handleTogglePlannedArrow}
+              onClearPlannedArrows={handleClearPlannedArrows}
+              onSelectPromotion={handleSelectPromotion}
+              onCancelPromotion={() => setPendingPromotion(null)}
+              hideHelperBox={!uiPrefs.showBoardTooltip}
+              boardSizePx={boardGeometry.boardSizePx}
+              maxFitSizePx={boardGeometry.maxFitSizePx}
+              boardTheme={uiPrefs.boardTheme}
+              coordinateStyle={uiPrefs.coordinateStyle}
+              boardScale={uiPrefs.boardScale}
+              isResizable={true}
+              onBoardScaleChange={(nextScale) =>
+                updateUiPrefs({ boardScale: nextScale }, true)
+              }
+              onResetBoardScale={() => updateUiPrefs({ boardScale: 1.0 }, true)}
+            />
+          </div>
 
           <UnderBoardPlayerStrip
             gameState={displayedGameState}
@@ -1905,7 +2003,10 @@ export default function App() {
             engineProfile={engineProfile}
             previewPly={previewPly}
             totalPlies={stateStack.length - 1}
-            frameWidthPx={boardGeometry.frameWidthPx}
+            frameWidthPx={
+              boardGeometry.frameWidthPx +
+              (uiPrefs.showEvalBar ? EVAL_BAR_RESERVE_PX : 0)
+            }
             onPreviewPly={setPreviewPly}
             onCopyFen={handleCopyCurrentFen}
             onCopyPgn={handleCopyCurrentPgn}
@@ -2035,6 +2136,7 @@ export default function App() {
             setIsGameReviewOpen(false);
             startNewMatch();
           }}
+          onOpenInReplay={handleOpenCurrentMatchInReplay}
         />
       )}
 
@@ -2164,6 +2266,7 @@ export default function App() {
           }}
           onOpenSavedGames={() => setIsSavedGamesOpen(true)}
           onOpenGameReview={handleOpenGameReview}
+          onOpenInReplay={handleOpenCurrentMatchInReplay}
         />
       )}
 
@@ -2250,6 +2353,7 @@ export default function App() {
         onRenameSession={handleRenameSession}
         onClearActiveSession={handleClearActiveSession}
         onImportSession={handleImportSession}
+        onOpenInReplay={handleOpenSessionInReplay}
       />
     </div>
   );

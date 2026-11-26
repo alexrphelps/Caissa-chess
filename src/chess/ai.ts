@@ -2081,7 +2081,19 @@ export function searchMultiPV(
     onInfo: options?.onInfo,
   });
 
-  const lines = outcome.multiPvLines ?? [];
+  const lines =
+    outcome.multiPvLines && outcome.multiPvLines.length > 0
+      ? outcome.multiPvLines
+      : outcome.bestMove
+      ? [
+          {
+            move: outcome.bestMove,
+            uci: outcome.bestUci,
+            score: outcome.score,
+            pv: outcome.pv,
+          },
+        ]
+      : [];
   const items: MultiPVItem[] = [];
   const seenKeys = new Set<string>();
 

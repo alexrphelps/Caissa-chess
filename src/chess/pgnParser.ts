@@ -4,18 +4,24 @@ import {
   generateLegalMoves,
   makeMove,
 } from './engine';
-import { gameStateToFen } from './sessionStorage';
+import { formatEvalScore } from './evaluation';
+import { exportSessionToPgn, gameStateToFen } from './sessionStorage';
 import {
+  Color,
+  EngineProfileState,
+  GameMode,
   GameState,
   Move,
   PieceType,
   PromotionPieceType,
+  StoredGameSession,
 } from './types';
 import {
   ParsedPgnGame,
   PgnBatchGameError,
   PgnHeaders,
   PgnParseBatchResult,
+  PgnVariationLine,
   TimelineMoveFlags,
   TimelineNode,
 } from './pgnTypes';
@@ -51,8 +57,63 @@ const EMPTY_FLAGS: TimelineMoveFlags = {
 };
 
 interface MovetextToken {
-  type: 'san' | 'comment' | 'nag' | 'result';
+  type: 'san' | 'comment' | 'nag' | 'result' | 'variation';
   value: string;
+  clock?: string | null;
+  pgnEval?: number | null;
+  pgnEvalFormatted?: string | null;
+}
+
+/**
+ * Parses machine annotations like `[%clk 0:05:12]` and `[%eval +0.42]` or `[%eval #-3]`
+ * embedded inside PGN `{...}` comments, returning both structured metadata and cleaned prose.
+ */
+export function extractCommentMetadata(rawComment: string): {
+  cleanedComment: string;
+  clock: string | null;
+  pgnEval: number | null;
+  pgnEvalFormatted: string | null;
+} {
+  let clock: string | null = null;
+  let pgnEval: number | null = null;
+  let pgnEvalFormatted: string | null = null;
+
+  const clkMatch = rawComment.match(/\[%clk\s+([0-9:.]+)\]/i);
+  if (clkMatch) {
+    // Normalize e.g. "0:05:12.3" -> "5:12" or "1:23:45" -> "1:23:45"
+    const rawClk = clkMatch[1].replace(/\.\d+$/, '');
+    const parts = rawClk.split(':');
+    if (parts.length === 3 && Number(parts[0]) === 0) {
+      clock = `${Number(parts[1])}:${parts[2].padStart(2, '0')}`;
+    } else {
+      clock = rawClk;
+    }
+  }
+
+  const evalMatch = rawComment.match(/\[%eval\s+([#+-]?\d+(?:\.\d+)?)\]/i);
+  if (evalMatch) {
+    const rawEval = evalMatch[1].trim();
+    if (rawEval.startsWith('#')) {
+      const mateNum = parseInt(rawEval.slice(1), 10);
+      if (Number.isFinite(mateNum) && mateNum !== 0) {
+        pgnEval = mateNum > 0 ? 100000 - Math.abs(mateNum) * 2 : -(100000 - Math.abs(mateNum) * 2);
+        pgnEvalFormatted = mateNum > 0 ? `M${mateNum}` : `-M${Math.abs(mateNum)}`;
+      }
+    } else {
+      const pawns = parseFloat(rawEval);
+      if (Number.isFinite(pawns)) {
+        pgnEval = Math.round(pawns * 100);
+        pgnEvalFormatted = formatEvalScore(pgnEval);
+      }
+    }
+  }
+
+  const cleanedComment = rawComment
+    .replace(/\[%[a-zA-Z0-9_]+\s+[^\]]*\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return { cleanedComment, clock, pgnEval, pgnEvalFormatted };
 }
 
 /**
@@ -170,9 +231,9 @@ export function parsePgnHeaders(gameChunk: string): {
 
 /**
  * Tokenizes PGN movetext while gracefully:
- * - Capturing `{...}` and `;...` comments
+ * - Capturing `{...}` and `;...` comments along with `[%clk]` & `[%eval]` tags
  * - Capturing NAG symbols (`$1`, `!`, `?`, `!!`, `??`, `!?`, `?!`)
- * - Skipping nested Recursive Annotation Variations `(... (...))`
+ * - Capturing Recursive Annotation Variations `(... (...))` as structured variation tokens
  * - Stripping move numbers (`1.`, `12...`)
  */
 export function tokenizeMovetext(movetext: string): MovetextToken[] {
@@ -198,13 +259,16 @@ export function tokenizeMovetext(movetext: string): MovetextToken[] {
       }
       const rawComment = movetext.slice(start, i).replace(/\s+/g, ' ').trim();
       if (i < len && movetext[i] === '}') i++;
-      // Strip common PGN clock/eval machine annotations like [%clk 0:05:00] or [%eval +0.34]
-      const cleanedComment = rawComment
-        .replace(/\[%[a-zA-Z0-9_]+\s+[^\]]*\]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (cleanedComment) {
-        tokens.push({ type: 'comment', value: cleanedComment });
+
+      const meta = extractCommentMetadata(rawComment);
+      if (meta.cleanedComment || meta.clock || meta.pgnEval !== null) {
+        tokens.push({
+          type: 'comment',
+          value: meta.cleanedComment,
+          clock: meta.clock,
+          pgnEval: meta.pgnEval,
+          pgnEvalFormatted: meta.pgnEvalFormatted,
+        });
       }
       continue;
     }
@@ -223,10 +287,11 @@ export function tokenizeMovetext(movetext: string): MovetextToken[] {
       continue;
     }
 
-    // Recursive Annotation Variation `( ... )` — skip entire nested subtree cleanly
+    // Recursive Annotation Variation `( ... )` — capture inner movetext cleanly
     if (ch === '(') {
       let depth = 1;
       i++;
+      const varStart = i;
       let insideBrace = false;
       while (i < len && depth > 0) {
         const c = movetext[i];
@@ -241,6 +306,10 @@ export function tokenizeMovetext(movetext: string): MovetextToken[] {
           else if (c === ')') depth--;
         }
         i++;
+      }
+      const varContent = movetext.slice(varStart, Math.max(varStart, i - 1)).trim();
+      if (varContent) {
+        tokens.push({ type: 'variation', value: varContent });
       }
       continue;
     }
@@ -429,8 +498,142 @@ export function resolveSanMove(state: GameState, rawSan: string): Move | null {
 }
 
 /**
+ * Builds a TimelineNode from applying a resolved legal move to `stateBefore`.
+ */
+export function buildTimelineNodeFromMove(
+  stateBefore: GameState,
+  resolvedMove: Move,
+  ply: number
+): TimelineNode {
+  const moverColor = stateBefore.turn;
+  const moveTurnNumber = stateBefore.fullMoveNumber;
+  const nextState = makeMove(stateBefore, resolvedMove);
+  const lastRecord = nextState.moveHistory[nextState.moveHistory.length - 1];
+  const canonicalSan = lastRecord?.san ?? `${resolvedMove.from}${resolvedMove.to}`;
+  const nextFen = gameStateToFen(nextState);
+
+  const flags: TimelineMoveFlags = {
+    check: nextState.inCheck,
+    checkmate: nextState.status === 'checkmate',
+    stalemate: nextState.status === 'stalemate',
+    castle: resolvedMove.isCastle ?? null,
+    promotion: resolvedMove.promotion ?? null,
+    enPassant: Boolean(resolvedMove.isEnPassant),
+    capture: Boolean(resolvedMove.captured),
+  };
+
+  return {
+    ply,
+    fen: nextFen,
+    san: canonicalSan,
+    from: resolvedMove.from,
+    to: resolvedMove.to,
+    captured: resolvedMove.captured?.type ?? null,
+    flags,
+    comment: null,
+    nag: null,
+    clock: null,
+    pgnEval: null,
+    pgnEvalFormatted: null,
+    turnNumber: moveTurnNumber,
+    color: moverColor,
+    gameState: nextState,
+  };
+}
+
+/**
+ * Formats a concise human-readable SAN preview label for a variation line
+ * e.g., "18... Nxd6 19. Bxd6 Qe7".
+ */
+function formatVariationLabel(nodes: TimelineNode[]): string {
+  const parts: string[] = [];
+  for (let i = 0; i < nodes.length && i < 6; i++) {
+    const n = nodes[i];
+    if (!n.san) continue;
+    if (n.color === 'w') {
+      parts.push(`${n.turnNumber}. ${n.san}${n.nag ?? ''}`);
+    } else if (i === 0) {
+      parts.push(`${n.turnNumber}... ${n.san}${n.nag ?? ''}`);
+    } else {
+      parts.push(`${n.san}${n.nag ?? ''}`);
+    }
+  }
+  const suffix = nodes.length > 6 ? ' …' : '';
+  return `${parts.join(' ')}${suffix}`;
+}
+
+/**
+ * Parses a PGN Recursive Annotation Variation `( ... )` starting from `branchBaseState`
+ * (the board state immediately BEFORE the mainline move that the variation is an alternative to).
+ * Gracefully returns null if the variation text has no valid legal moves.
+ */
+function parseVariationLine(
+  varMovetext: string,
+  branchBaseState: GameState,
+  basePly: number,
+  variationId: string
+): PgnVariationLine | null {
+  const tokens = tokenizeMovetext(varMovetext);
+  const nodes: TimelineNode[] = [];
+  let curr = branchBaseState;
+
+  for (const token of tokens) {
+    if (token.type === 'comment') {
+      const last = nodes[nodes.length - 1];
+      if (last) {
+        if (token.value) {
+          last.comment = last.comment ? `${last.comment} ${token.value}` : token.value;
+        }
+        if (token.clock) last.clock = token.clock;
+        if (token.pgnEval !== undefined && token.pgnEval !== null) {
+          last.pgnEval = token.pgnEval;
+          last.pgnEvalFormatted = token.pgnEvalFormatted ?? null;
+        }
+      }
+      continue;
+    }
+
+    if (token.type === 'nag') {
+      const last = nodes[nodes.length - 1];
+      if (last) {
+        last.nag = last.nag ? `${last.nag}${token.value}` : token.value;
+      }
+      continue;
+    }
+
+    if (token.type === 'variation') {
+      // Nested sub-variations inside a variation are safely ignored to keep UI clean
+      continue;
+    }
+
+    if (token.type === 'result') {
+      break;
+    }
+
+    const resolved = resolveSanMove(curr, token.value);
+    if (!resolved) {
+      // Stop parsing malformed variation cleanly without throwing on the mainline game
+      break;
+    }
+
+    const node = buildTimelineNodeFromMove(curr, resolved, basePly + nodes.length + 1);
+    nodes.push(node);
+    curr = node.gameState;
+  }
+
+  if (nodes.length === 0) return null;
+
+  return {
+    id: variationId,
+    label: formatVariationLabel(nodes),
+    nodes,
+  };
+}
+
+/**
  * Parses a single PGN game chunk into an indexed `ParsedPgnGame` with a complete
- * pre-computed timeline (`ply 0..N`) of immutable `GameState` snapshots and FENs.
+ * pre-computed timeline (`ply 0..N`) of immutable `GameState` snapshots, FENs,
+ * parsed clock/eval tags, and Recursive Annotation Variations.
  */
 export function parseSinglePgnGame(
   gameChunk: string,
@@ -479,6 +682,9 @@ export function parseSinglePgnGame(
       flags: { ...EMPTY_FLAGS },
       comment: null,
       nag: null,
+      clock: null,
+      pgnEval: null,
+      pgnEvalFormatted: null,
       turnNumber: initialState.fullMoveNumber,
       color: null,
       gameState: initialState,
@@ -491,9 +697,18 @@ export function parseSinglePgnGame(
   for (const token of tokens) {
     if (token.type === 'comment') {
       const lastNode = timeline[timeline.length - 1];
-      lastNode.comment = lastNode.comment
-        ? `${lastNode.comment} ${token.value}`
-        : token.value;
+      if (token.value) {
+        lastNode.comment = lastNode.comment
+          ? `${lastNode.comment} ${token.value}`
+          : token.value;
+      }
+      if (token.clock) {
+        lastNode.clock = token.clock;
+      }
+      if (token.pgnEval !== undefined && token.pgnEval !== null) {
+        lastNode.pgnEval = token.pgnEval;
+        lastNode.pgnEvalFormatted = token.pgnEvalFormatted ?? null;
+      }
       continue;
     }
 
@@ -503,6 +718,29 @@ export function parseSinglePgnGame(
         lastNode.nag = lastNode.nag
           ? `${lastNode.nag}${token.value}`
           : token.value;
+      }
+      continue;
+    }
+
+    if (token.type === 'variation') {
+      // Standard PGN RAV: a variation immediately following move M is an alternative to move M,
+      // so it branches from the state BEFORE move M (`timeline[timeline.length - 2]`).
+      if (timeline.length >= 2) {
+        const targetNode = timeline[timeline.length - 1];
+        const parentNode = timeline[timeline.length - 2];
+        const varIndex = targetNode.variations?.length ?? 0;
+        const parsedVar = parseVariationLine(
+          token.value,
+          parentNode.gameState,
+          parentNode.ply,
+          `var_${targetNode.ply}_${varIndex}`
+        );
+        if (parsedVar) {
+          if (!targetNode.variations) {
+            targetNode.variations = [];
+          }
+          targetNode.variations.push(parsedVar);
+        }
       }
       continue;
     }
@@ -523,39 +761,9 @@ export function parseSinglePgnGame(
       );
     }
 
-    const moverColor = currentState.turn;
-    const moveTurnNumber = currentState.fullMoveNumber;
-    const nextState = makeMove(currentState, resolvedMove);
-    const lastRecord = nextState.moveHistory[nextState.moveHistory.length - 1];
-    const canonicalSan = lastRecord?.san ?? token.value;
-    const nextFen = gameStateToFen(nextState);
-
-    const flags: TimelineMoveFlags = {
-      check: nextState.inCheck,
-      checkmate: nextState.status === 'checkmate',
-      stalemate: nextState.status === 'stalemate',
-      castle: resolvedMove.isCastle ?? null,
-      promotion: resolvedMove.promotion ?? null,
-      enPassant: Boolean(resolvedMove.isEnPassant),
-      capture: Boolean(resolvedMove.captured),
-    };
-
-    timeline.push({
-      ply: timeline.length,
-      fen: nextFen,
-      san: canonicalSan,
-      from: resolvedMove.from,
-      to: resolvedMove.to,
-      captured: resolvedMove.captured?.type ?? null,
-      flags,
-      comment: null,
-      nag: null,
-      turnNumber: moveTurnNumber,
-      color: moverColor,
-      gameState: nextState,
-    });
-
-    currentState = nextState;
+    const node = buildTimelineNodeFromMove(currentState, resolvedMove, timeline.length);
+    timeline.push(node);
+    currentState = node.gameState;
   }
 
   // Reject bare gibberish with no headers and 0 moves
@@ -663,6 +871,187 @@ export function buildStateStackUpToPly(
     Math.min(targetPly, game.timeline.length - 1)
   );
   return game.timeline.slice(0, clampedPly + 1).map((node) => node.gameState);
+}
+
+/**
+ * Converts a live or archived `stateStack` (e.g. a saved match or completed user game)
+ * directly into a `ParsedPgnGame` ready to open in Replay Studio without losing any
+ * custom starting position, castling rights, or move history.
+ */
+export function convertStateStackToParsedPgnGame(params: {
+  id?: string;
+  title?: string;
+  stateStack: GameState[];
+  gameMode: GameMode;
+  playerColor: Color;
+  engineProfile?: EngineProfileState;
+  createdAt?: number;
+  rawPgn?: string;
+}): ParsedPgnGame {
+  const stack =
+    params.stateStack.length > 0
+      ? params.stateStack
+      : [createInitialGameState()];
+  const firstState = stack[0];
+  const lastState = stack[stack.length - 1];
+
+  const startingFen = gameStateToFen(firstState);
+  const standardStartFen = gameStateToFen(createInitialGameState());
+  const isCustomStart = startingFen !== standardStartFen;
+
+  let result = '*';
+  if (lastState.status === 'checkmate') {
+    result = lastState.winner === 'w' ? '1-0' : '0-1';
+  } else if (
+    lastState.status === 'stalemate' ||
+    lastState.status.startsWith('draw_')
+  ) {
+    result = '1/2-1/2';
+  }
+
+  const aiLabel = `Caïssa AI (${params.engineProfile?.elo ?? 1000} Elo)`;
+  const whiteName =
+    params.gameMode === 'pass_and_play'
+      ? 'Player 1 (White)'
+      : params.playerColor === 'w'
+      ? 'You'
+      : aiLabel;
+  const blackName =
+    params.gameMode === 'pass_and_play'
+      ? 'Player 2 (Black)'
+      : params.playerColor === 'b'
+      ? 'You'
+      : aiLabel;
+
+  const dateStr = new Date(params.createdAt ?? Date.now())
+    .toISOString()
+    .slice(0, 10)
+    .replace(/-/g, '.');
+
+  const headers: PgnHeaders = {
+    Event: params.title || 'Saved User Match',
+    Site: 'Caïssa Chess Salon',
+    Date: dateStr,
+    Round: '?',
+    White: whiteName,
+    Black: blackName,
+    Result: result,
+    ...(isCustomStart ? { FEN: startingFen, SetUp: '1' } : {}),
+  };
+
+  const timeline: TimelineNode[] = [
+    {
+      ply: 0,
+      fen: startingFen,
+      san: null,
+      from: null,
+      to: null,
+      captured: null,
+      flags: { ...EMPTY_FLAGS },
+      comment: null,
+      nag: null,
+      clock: null,
+      pgnEval: null,
+      pgnEvalFormatted: null,
+      turnNumber: firstState.fullMoveNumber,
+      color: null,
+      gameState: firstState,
+    },
+  ];
+
+  for (let i = 1; i < stack.length; i++) {
+    const st = stack[i];
+    const lastRec = st.moveHistory[st.moveHistory.length - 1];
+    if (!lastRec) continue;
+
+    const flags: TimelineMoveFlags = {
+      check: st.inCheck,
+      checkmate: st.status === 'checkmate',
+      stalemate: st.status === 'stalemate',
+      castle: lastRec.move.isCastle ?? null,
+      promotion: lastRec.move.promotion ?? null,
+      enPassant: Boolean(lastRec.move.isEnPassant),
+      capture: Boolean(lastRec.move.captured),
+    };
+
+    timeline.push({
+      ply: i,
+      fen: gameStateToFen(st),
+      san: lastRec.san,
+      from: lastRec.move.from,
+      to: lastRec.move.to,
+      captured: lastRec.move.captured?.type ?? null,
+      flags,
+      comment: null,
+      nag: null,
+      clock: null,
+      pgnEval: null,
+      pgnEvalFormatted: null,
+      turnNumber: lastRec.turnNumber,
+      color: lastRec.color,
+      gameState: st,
+    });
+  }
+
+  // Generate clean PGN text if not provided
+  let rawPgn = params.rawPgn ?? '';
+  if (!rawPgn) {
+    const moveTokens: string[] = [];
+    for (let i = 1; i < timeline.length; i++) {
+      const node = timeline[i];
+      if (!node.san) continue;
+      if (node.color === 'w') {
+        moveTokens.push(`${node.turnNumber}. ${node.san}`);
+      } else if (i === 1) {
+        moveTokens.push(`${node.turnNumber}... ${node.san}`);
+      } else {
+        moveTokens.push(node.san);
+      }
+    }
+    const headerLines = [
+      `[Event "${headers.Event}"]`,
+      `[Site "${headers.Site}"]`,
+      `[Date "${headers.Date}"]`,
+      `[White "${headers.White}"]`,
+      `[Black "${headers.Black}"]`,
+      `[Result "${headers.Result}"]`,
+    ];
+    if (isCustomStart) {
+      headerLines.push(`[SetUp "1"]`, `[FEN "${startingFen}"]`);
+    }
+    const movesText =
+      moveTokens.length > 0 ? `${moveTokens.join(' ')} ${result}` : result;
+    rawPgn = `${headerLines.join('\n')}\n\n${movesText}`;
+  }
+
+  return {
+    id: params.id ?? `user_replay_${Date.now()}`,
+    headers,
+    timeline,
+    startingFen,
+    isCustomStart,
+    result,
+    description: params.title ? `Your match: ${params.title}` : undefined,
+    rawPgn,
+  };
+}
+
+/**
+ * Converts a saved `StoredGameSession` directly into a `ParsedPgnGame` for Replay Studio.
+ */
+export function convertSessionToParsedPgnGame(
+  session: StoredGameSession
+): ParsedPgnGame {
+  return convertStateStackToParsedPgnGame({
+    id: `session_replay_${session.id}`,
+    title: session.title,
+    stateStack: session.stateStack,
+    gameMode: session.gameMode,
+    playerColor: session.playerColor,
+    engineProfile: session.engineProfile,
+    createdAt: session.createdAt,
+    rawPgn: exportSessionToPgn(session),
+  });
 }
 
 /**

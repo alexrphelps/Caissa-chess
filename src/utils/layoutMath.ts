@@ -100,6 +100,9 @@ export interface UILayoutPreferences {
   coachPanelWidth: number; // px on desktop split layout
   isCoachPanelOpen: boolean;
   showBoardTooltip: boolean;
+  showEvalBar: boolean;
+  isReplayCoachExpanded: boolean;
+  isReplayMoveListExpanded: boolean;
 }
 
 export const DEFAULT_UI_LAYOUT_PREFERENCES: UILayoutPreferences = {
@@ -109,6 +112,9 @@ export const DEFAULT_UI_LAYOUT_PREFERENCES: UILayoutPreferences = {
   coachPanelWidth: 440,
   isCoachPanelOpen: true,
   showBoardTooltip: true,
+  showEvalBar: true,
+  isReplayCoachExpanded: true,
+  isReplayMoveListExpanded: true,
 };
 
 export const UI_LAYOUT_STORAGE_KEY = 'caissa_ui_layout_preferences_v1';
@@ -117,6 +123,7 @@ export const MIN_COACH_WIDTH = 280;
 export const MAX_COACH_WIDTH = 760;
 export const MIN_BOARD_COLUMN_WIDTH = 360;
 export const SPLITTER_WIDTH_PX = 14;
+export const EVAL_BAR_RESERVE_PX = 34; // 26px bar + 8px gap
 export const MIN_BOARD_SCALE = 0.55;
 export const MAX_BOARD_SCALE = 1.0;
 export const MIN_BOARD_GRID_PX = 240;
@@ -197,6 +204,7 @@ export interface ComputeBoardGridSizeInput {
   boardScale: number;
   coordinateStyle: CoordinateStyle;
   showHelperBox: boolean;
+  showEvalBar?: boolean;
   underBoardStripHeight?: number;
   isStackedLayout?: boolean;
   minGridPx?: number;
@@ -224,12 +232,14 @@ export function computeBoardGridSize(
     boardScale,
     coordinateStyle,
     showHelperBox,
+    showEvalBar = false,
     underBoardStripHeight = 98,
     isStackedLayout = false,
     minGridPx = MIN_BOARD_GRID_PX,
   } = input;
 
   const chrome = getBoardFrameChrome(coordinateStyle, showHelperBox);
+  const evalBarExtra = showEvalBar ? EVAL_BAR_RESERVE_PX : 0;
   const clampedScale = clampNumber(
     boardScale,
     MIN_BOARD_SCALE,
@@ -239,7 +249,7 @@ export function computeBoardGridSize(
   // Horizontal budget for the 8x8 grid itself
   const maxGridByWidth = Math.max(
     minGridPx,
-    availableWidth - chrome.extraWidthPx
+    availableWidth - chrome.extraWidthPx - evalBarExtra
   );
 
   // Vertical budget for the 8x8 grid itself (leave room for under-board player strip & gap)
@@ -342,6 +352,21 @@ export function sanitizeUILayoutPreferences(
       ? obj.showBoardTooltip
       : DEFAULT_UI_LAYOUT_PREFERENCES.showBoardTooltip;
 
+  const showEvalBar =
+    typeof obj.showEvalBar === 'boolean'
+      ? obj.showEvalBar
+      : DEFAULT_UI_LAYOUT_PREFERENCES.showEvalBar;
+
+  const isReplayCoachExpanded =
+    typeof obj.isReplayCoachExpanded === 'boolean'
+      ? obj.isReplayCoachExpanded
+      : DEFAULT_UI_LAYOUT_PREFERENCES.isReplayCoachExpanded;
+
+  const isReplayMoveListExpanded =
+    typeof obj.isReplayMoveListExpanded === 'boolean'
+      ? obj.isReplayMoveListExpanded
+      : DEFAULT_UI_LAYOUT_PREFERENCES.isReplayMoveListExpanded;
+
   return {
     boardTheme,
     coordinateStyle,
@@ -349,6 +374,9 @@ export function sanitizeUILayoutPreferences(
     coachPanelWidth,
     isCoachPanelOpen,
     showBoardTooltip,
+    showEvalBar,
+    isReplayCoachExpanded,
+    isReplayMoveListExpanded,
   };
 }
 

@@ -282,3 +282,70 @@ test('reports clear errors on malformed or illegal PGNs', () => {
   assert.equal(badFenRes.errors.length, 1);
   assert.ok(badFenRes.errors[0].error.includes('Invalid starting FEN'));
 });
+
+test('extracts [%clk] and [%eval] tags cleanly from comments and preserves clickable RAV variations', async () => {
+  const { convertStateStackToParsedPgnGame, convertSessionToParsedPgnGame } =
+    await import('./pgnParser');
+  const { createInitialGameState } = await import('./engine');
+  const { createStoredSession } = await import('./sessionStorage');
+  const { createEngineProfileFromPreset } = await import('./evaluation');
+
+  const annotatedPgn = `
+[Event "Lichess Rapid"]
+[White "Alice"]
+[Black "Bob"]
+[Result "1-0"]
+
+1. e4 {[%clk 0:10:00] [%eval 0.25] Standard king pawn} (1. d4 d5 2. c4)
+1... e5 {[%clk 0:09:58] [%eval #3] Forced mate sequence}
+2. Nf3 Nc6 1-0
+`;
+  const parsed = parseSinglePgnGame(annotatedPgn);
+  assert.equal(parsed.timeline[1].clock, '10:00');
+  assert.equal(parsed.timeline[1].pgnEval, 25);
+  assert.equal(parsed.timeline[1].pgnEvalFormatted, '+0.3');
+  assert.equal(parsed.timeline[1].comment, 'Standard king pawn');
+  assert.ok(
+    parsed.timeline[1].variations && parsed.timeline[1].variations.length === 1
+  );
+  assert.equal(parsed.timeline[1].variations![0].nodes.length, 3);
+  assert.equal(parsed.timeline[1].variations![0].nodes[0].san, 'd4');
+
+  // Mate eval parsing
+  assert.equal(parsed.timeline[2].clock, '9:58');
+  assert.ok((parsed.timeline[2].pgnEval ?? 0) > 20000);
+  assert.equal(parsed.timeline[2].pgnEvalFormatted, 'M3');
+  assert.equal(parsed.timeline[2].comment, 'Forced mate sequence');
+
+  // Session & stateStack conversion into ParsedPgnGame
+  const s0 = createInitialGameState();
+  const m1 = generateLegalMoves(s0).find((m) => m.from === 'e2' && m.to === 'e4')!;
+  const s1 = makeMove(s0, m1);
+  const m2 = generateLegalMoves(s1).find((m) => m.from === 'e7' && m.to === 'e5')!;
+  const s2 = makeMove(s1, m2);
+
+  const fromStack = convertStateStackToParsedPgnGame({
+    stateStack: [s0, s1, s2],
+    gameMode: 'ai',
+    playerColor: 'w',
+    engineProfile: createEngineProfileFromPreset('club'),
+    title: 'Stack Replay',
+  });
+  assert.equal(fromStack.timeline.length, 3);
+  assert.equal(fromStack.timeline[1].san, 'e4');
+  assert.equal(fromStack.timeline[2].san, 'e5');
+
+  const stored = createStoredSession({
+    stateStack: [s0, s1, s2],
+    gameMode: 'ai',
+    playerColor: 'w',
+    isFlipped: false,
+    engineProfile: createEngineProfileFromPreset('club'),
+    customTitle: 'Club Test Match',
+  });
+  const fromSession = convertSessionToParsedPgnGame(stored);
+  assert.equal(fromSession.headers.Event, 'Club Test Match');
+  assert.equal(fromSession.timeline.length, 3);
+  assert.equal(fromSession.headers.White, 'You');
+});
+

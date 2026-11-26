@@ -6,6 +6,13 @@ import {
 } from './ai';
 import { FastBoard, START_FEN } from './engineCore/board';
 import { SearchInfoEvent, fastMoveToUci } from './engineCore/types';
+import {
+  GameReviewProgressEvent,
+  GameReviewReport,
+  generateGameReview,
+} from './gameReview';
+import { ReplayPlyCoachInsight, TimelineNode } from './pgnTypes';
+import { analyzeReplayPly } from './replayCoach';
 import { analyzeTacticsDeep, TacticsAnalysis } from './tacticsHelper';
 import {
   AIDifficulty,
@@ -31,6 +38,21 @@ export type AIWorkerRequest =
       maxTimeMs?: number;
       engineConfig?: Partial<ChessEngineConfig>;
       coachPlaystyle?: CoachPlaystyleProfile;
+    }
+  | {
+      type: 'replay_ply_analysis';
+      requestId: number;
+      stateBefore: GameState | null;
+      playedNode: TimelineNode;
+      stateAfter: GameState;
+      cacheKey?: string;
+      maxDepth?: number;
+      maxTimeMs?: number;
+    }
+  | {
+      type: 'full_game_review';
+      requestId: number;
+      stateStack: GameState[];
     }
   | {
       type: 'position';
@@ -63,6 +85,21 @@ export type AIWorkerResponse =
       type: 'coach_analysis';
       requestId: number;
       analysis: TacticsAnalysis;
+    }
+  | {
+      type: 'replay_ply_analysis';
+      requestId: number;
+      insight: ReplayPlyCoachInsight;
+    }
+  | {
+      type: 'full_game_review_progress';
+      requestId: number;
+      progress: GameReviewProgressEvent;
+    }
+  | {
+      type: 'full_game_review';
+      requestId: number;
+      report: GameReviewReport;
     }
   | {
       type: 'info';
@@ -175,6 +212,43 @@ ctx.onmessage = (event: MessageEvent<AIWorkerRequest>) => {
       type: 'coach_analysis',
       requestId: data.requestId,
       analysis,
+    };
+    ctx.postMessage(response);
+    return;
+  }
+
+  if (data.type === 'replay_ply_analysis') {
+    const insight = analyzeReplayPly(
+      data.stateBefore,
+      data.playedNode,
+      data.stateAfter,
+      {
+        cacheKey: data.cacheKey,
+        maxDepth: data.maxDepth,
+        maxTimeMs: data.maxTimeMs,
+      }
+    );
+    const response: AIWorkerResponse = {
+      type: 'replay_ply_analysis',
+      requestId: data.requestId,
+      insight,
+    };
+    ctx.postMessage(response);
+    return;
+  }
+
+  if (data.type === 'full_game_review') {
+    const report = generateGameReview(data.stateStack, (progress) => {
+      ctx.postMessage({
+        type: 'full_game_review_progress',
+        requestId: data.requestId,
+        progress,
+      });
+    });
+    const response: AIWorkerResponse = {
+      type: 'full_game_review',
+      requestId: data.requestId,
+      report,
     };
     ctx.postMessage(response);
     return;

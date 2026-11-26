@@ -178,6 +178,9 @@ test('sanitizeUILayoutPreferences validates and repairs invalid persisted values
     coachPanelWidth: 50,
     isCoachPanelOpen: false,
     showBoardTooltip: false,
+    showEvalBar: false,
+    isReplayCoachExpanded: false,
+    isReplayMoveListExpanded: false,
   });
 
   assert.equal(repaired.boardTheme, 'mahogany');
@@ -186,4 +189,34 @@ test('sanitizeUILayoutPreferences validates and repairs invalid persisted values
   assert.equal(repaired.coachPanelWidth, MIN_COACH_WIDTH);
   assert.equal(repaired.isCoachPanelOpen, false);
   assert.equal(repaired.showBoardTooltip, false);
+  assert.equal(repaired.showEvalBar, false);
+  assert.equal(repaired.isReplayCoachExpanded, false);
+  assert.equal(repaired.isReplayMoveListExpanded, false);
 });
+
+test('computeBoardGridSize reserves horizontal room for EvalBar without clipping', () => {
+  const withoutBar = computeBoardGridSize({
+    availableWidth: 600,
+    availableHeight: 820,
+    boardScale: 1.0,
+    coordinateStyle: 'both',
+    showHelperBox: false,
+    showEvalBar: false,
+  });
+
+  const withBar = computeBoardGridSize({
+    availableWidth: 600,
+    availableHeight: 820,
+    boardScale: 1.0,
+    coordinateStyle: 'both',
+    showHelperBox: false,
+    showEvalBar: true,
+  });
+
+  assert.ok(
+    withBar.frameWidthPx + 34 <= 600,
+    `Board frame (${withBar.frameWidthPx}) + eval bar (34) must fit in 600px`
+  );
+  assert.ok(withBar.boardSizePx <= withoutBar.boardSizePx);
+});
+
