@@ -5,6 +5,7 @@ interface ChessPieceSvgProps {
   type: PieceType;
   color: Color;
   className?: string;
+  shadow?: boolean;
 }
 
 export const PIECE_NAMES: Record<PieceType, string> = {
@@ -24,19 +25,23 @@ export const ChessPieceSvg: React.FC<ChessPieceSvgProps> = ({
   type,
   color,
   className = 'w-full h-full',
+  shadow = true,
 }) => {
   const isWhite = color === 'w';
   const fill = isWhite ? '#FCF9F2' : '#22262A';
   const shadeFill = isWhite ? '#E6DEC8' : '#15181B';
   const stroke = isWhite ? '#231B15' : '#0D0F12';
   const innerStroke = isWhite ? '#4A3B2F' : '#C8B9A6';
+  const svgClassName = shadow
+    ? `${className} select-none drop-shadow-[0_3px_3px_rgba(0,0,0,0.42)]`
+    : `${className} select-none`;
 
   switch (type) {
     case 'p':
       return (
         <svg
           viewBox="0 0 45 45"
-          className={`${className} select-none drop-shadow-[0_3px_3px_rgba(0,0,0,0.42)]`}
+          className={svgClassName}
           aria-hidden="true"
         >
           {/* Base */}
@@ -91,7 +96,7 @@ export const ChessPieceSvg: React.FC<ChessPieceSvgProps> = ({
       return (
         <svg
           viewBox="0 0 45 45"
-          className={`${className} select-none drop-shadow-[0_3px_3px_rgba(0,0,0,0.42)]`}
+          className={svgClassName}
           aria-hidden="true"
         >
           {/* Base */}
@@ -145,7 +150,7 @@ export const ChessPieceSvg: React.FC<ChessPieceSvgProps> = ({
       return (
         <svg
           viewBox="0 0 45 45"
-          className={`${className} select-none drop-shadow-[0_3px_3px_rgba(0,0,0,0.42)]`}
+          className={svgClassName}
           aria-hidden="true"
         >
           {/* Base */}
@@ -189,7 +194,7 @@ export const ChessPieceSvg: React.FC<ChessPieceSvgProps> = ({
       return (
         <svg
           viewBox="0 0 45 45"
-          className={`${className} select-none drop-shadow-[0_3px_3px_rgba(0,0,0,0.42)]`}
+          className={svgClassName}
           aria-hidden="true"
         >
           <g fill={fill} stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -215,7 +220,7 @@ export const ChessPieceSvg: React.FC<ChessPieceSvgProps> = ({
       return (
         <svg
           viewBox="0 0 45 45"
-          className={`${className} select-none drop-shadow-[0_3px_3px_rgba(0,0,0,0.42)]`}
+          className={svgClassName}
           aria-hidden="true"
         >
           <g fill={fill} stroke={stroke} strokeWidth="2" strokeLinejoin="round">
@@ -246,7 +251,7 @@ export const ChessPieceSvg: React.FC<ChessPieceSvgProps> = ({
       return (
         <svg
           viewBox="0 0 45 45"
-          className={`${className} select-none drop-shadow-[0_3px_3px_rgba(0,0,0,0.42)]`}
+          className={svgClassName}
           aria-hidden="true"
         >
           <g fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

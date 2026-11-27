@@ -1398,6 +1398,7 @@ export const ReplayModeView: React.FC<ReplayModeViewProps> = ({
               maxFitSizePx={boardGeometry.maxFitSizePx}
               boardTheme={uiPrefs.boardTheme}
               coordinateStyle={uiPrefs.coordinateStyle}
+              pieceOrientation={uiPrefs.pieceOrientation}
               boardScale={uiPrefs.boardScale}
               isResizable={Boolean(onUpdateUiPrefs)}
               onBoardScaleChange={(nextScale) =>

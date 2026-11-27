@@ -4,9 +4,11 @@ import {
   BOARD_ROTATIONS,
   boardToVisualCoords,
   describeBoardRotation,
+  describePieceOrientation,
   flipBoardRotation,
   getBoardEdgeLabels,
   getColorBoardSide,
+  getPieceVisualRotation,
   normalizeBoardRotation,
   resolveBoardRotation,
   rotateBoardCCW,
@@ -161,3 +163,34 @@ test('rotation stepping, flipping, normalization, and side descriptors work dete
   assert.equal(getColorBoardSide('w', 270), 'right');
   assert.equal(getColorBoardSide('b', 270), 'left');
 });
+
+test('getPieceVisualRotation orients pieces accurately in facing, board, and upright modes', () => {
+  // Facing opponent (default): White faces rank 8 (boardRotation), Black faces rank 1 (boardRotation + 180)
+  assert.equal(getPieceVisualRotation('w', 0, 'facing'), 0);
+  assert.equal(getPieceVisualRotation('b', 0, 'facing'), 180);
+  assert.equal(getPieceVisualRotation('w', 90, 'facing'), 90);
+  assert.equal(getPieceVisualRotation('b', 90, 'facing'), 270);
+  assert.equal(getPieceVisualRotation('w', 180, 'facing'), 180);
+  assert.equal(getPieceVisualRotation('b', 180, 'facing'), 0);
+  assert.equal(getPieceVisualRotation('w', 270, 'facing'), 270);
+  assert.equal(getPieceVisualRotation('b', 270, 'facing'), 90);
+
+  // Follow board: all pieces rotate uniformly relative to perspectiveColor home side
+  assert.equal(getPieceVisualRotation('w', 90, 'board', 'w'), 90);
+  assert.equal(getPieceVisualRotation('b', 90, 'board', 'w'), 90);
+  assert.equal(getPieceVisualRotation('w', 180, 'board', 'b'), 0);
+  assert.equal(getPieceVisualRotation('b', 180, 'board', 'b'), 0);
+  assert.equal(getPieceVisualRotation('w', 270, 'board', 'b'), 90);
+  assert.equal(getPieceVisualRotation('b', 270, 'board', 'b'), 90);
+
+  // Always upright: always 0 regardless of angle or color
+  for (const rot of BOARD_ROTATIONS) {
+    assert.equal(getPieceVisualRotation('w', rot, 'upright'), 0);
+    assert.equal(getPieceVisualRotation('b', rot, 'upright'), 0);
+  }
+
+  assert.equal(describePieceOrientation('facing'), 'Facing Opponent');
+  assert.equal(describePieceOrientation('board'), 'With Board');
+  assert.equal(describePieceOrientation('upright'), 'Always Upright');
+});
+

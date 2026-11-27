@@ -1,6 +1,10 @@
+import { PieceOrientationMode } from './boardOrientation';
+
 export type BoardThemeId = 'mahogany' | 'emerald' | 'slate' | 'obsidian';
 
 export type CoordinateStyle = 'both' | 'inside' | 'outside' | 'none';
+
+export type { PieceOrientationMode };
 
 export interface BoardThemeConfig {
   id: BoardThemeId;
@@ -96,6 +100,7 @@ export const BOARD_THEME_LIST: BoardThemeConfig[] = [
 export interface UILayoutPreferences {
   boardTheme: BoardThemeId;
   coordinateStyle: CoordinateStyle;
+  pieceOrientation: PieceOrientationMode;
   boardScale: number; // 0.55 to 1.0 (1.0 = auto-fit max)
   coachPanelWidth: number; // px on desktop split layout
   isCoachPanelOpen: boolean;
@@ -108,6 +113,7 @@ export interface UILayoutPreferences {
 export const DEFAULT_UI_LAYOUT_PREFERENCES: UILayoutPreferences = {
   boardTheme: 'mahogany',
   coordinateStyle: 'both',
+  pieceOrientation: 'facing',
   boardScale: 1.0,
   coachPanelWidth: 440,
   isCoachPanelOpen: true,
@@ -330,6 +336,13 @@ export function sanitizeUILayoutPreferences(
       ? obj.coordinateStyle
       : DEFAULT_UI_LAYOUT_PREFERENCES.coordinateStyle;
 
+  const pieceOrientation: PieceOrientationMode =
+    obj.pieceOrientation === 'facing' ||
+    obj.pieceOrientation === 'board' ||
+    obj.pieceOrientation === 'upright'
+      ? obj.pieceOrientation
+      : DEFAULT_UI_LAYOUT_PREFERENCES.pieceOrientation;
+
   const boardScale =
     typeof obj.boardScale === 'number'
       ? clampNumber(obj.boardScale, MIN_BOARD_SCALE, MAX_BOARD_SCALE)
@@ -370,6 +383,7 @@ export function sanitizeUILayoutPreferences(
   return {
     boardTheme,
     coordinateStyle,
+    pieceOrientation,
     boardScale,
     coachPanelWidth,
     isCoachPanelOpen,

@@ -174,6 +174,7 @@ test('sanitizeUILayoutPreferences validates and repairs invalid persisted values
   const repaired = sanitizeUILayoutPreferences({
     boardTheme: 'invalid_theme',
     coordinateStyle: 'weird',
+    pieceOrientation: 'sideways' as never,
     boardScale: 99,
     coachPanelWidth: 50,
     isCoachPanelOpen: false,
@@ -185,6 +186,7 @@ test('sanitizeUILayoutPreferences validates and repairs invalid persisted values
 
   assert.equal(repaired.boardTheme, 'mahogany');
   assert.equal(repaired.coordinateStyle, 'both');
+  assert.equal(repaired.pieceOrientation, 'facing');
   assert.equal(repaired.boardScale, 1.0);
   assert.equal(repaired.coachPanelWidth, MIN_COACH_WIDTH);
   assert.equal(repaired.isCoachPanelOpen, false);
@@ -192,6 +194,11 @@ test('sanitizeUILayoutPreferences validates and repairs invalid persisted values
   assert.equal(repaired.showEvalBar, false);
   assert.equal(repaired.isReplayCoachExpanded, false);
   assert.equal(repaired.isReplayMoveListExpanded, false);
+
+  const preservedBoardMode = sanitizeUILayoutPreferences({
+    pieceOrientation: 'board',
+  });
+  assert.equal(preservedBoardMode.pieceOrientation, 'board');
 });
 
 test('computeBoardGridSize reserves horizontal room for EvalBar without clipping', () => {

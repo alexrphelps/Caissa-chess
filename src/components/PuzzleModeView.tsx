@@ -1138,6 +1138,7 @@ export const PuzzleModeView: React.FC<PuzzleModeViewProps> = ({
               maxFitSizePx={puzzleBoardGeometry.maxFitSizePx}
               boardTheme={uiPrefs.boardTheme}
               coordinateStyle={uiPrefs.coordinateStyle}
+              pieceOrientation={uiPrefs.pieceOrientation}
               boardScale={uiPrefs.boardScale}
               isResizable={Boolean(onUpdateUiPrefs)}
               onBoardScaleChange={

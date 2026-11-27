@@ -204,3 +204,54 @@ export function getColorBoardSide(
       return 'top';
   }
 }
+
+export type PieceOrientationMode = 'facing' | 'board' | 'upright';
+
+export const PIECE_ORIENTATION_MODES: readonly PieceOrientationMode[] = [
+  'facing',
+  'board',
+  'upright',
+];
+
+/**
+ * Computes the clockwise CSS rotation (in degrees: 0 | 90 | 180 | 270) for a chess piece SVG
+ * rendered on a board rotated by `boardRotation`.
+ *
+ * - `'facing'` (default): Each color's pieces face across the board toward their opponent
+ *   (White base toward rank 1 -> `boardRotation`; Black base toward rank 8 -> `boardRotation + 180`).
+ * - `'board'`: All pieces rotate uniformly with the board relative to `perspectiveColor`'s home side.
+ * - `'upright'`: All pieces stay upright (0°) regardless of board rotation.
+ */
+export function getPieceVisualRotation(
+  pieceColor: Color,
+  boardRotation: BoardRotation,
+  mode: PieceOrientationMode = 'facing',
+  perspectiveColor: Color = 'w'
+): BoardRotation {
+  switch (mode) {
+    case 'upright':
+      return 0;
+    case 'board': {
+      const baseAngle = perspectiveColor === 'b' ? 180 : 0;
+      return normalizeBoardRotation(boardRotation - baseAngle);
+    }
+    case 'facing':
+    default:
+      return pieceColor === 'w'
+        ? boardRotation
+        : normalizeBoardRotation(boardRotation + 180);
+  }
+}
+
+export function describePieceOrientation(mode: PieceOrientationMode): string {
+  switch (mode) {
+    case 'board':
+      return 'With Board';
+    case 'upright':
+      return 'Always Upright';
+    case 'facing':
+    default:
+      return 'Facing Opponent';
+  }
+}
+

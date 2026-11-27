@@ -41,6 +41,9 @@ import {
 import {
   BOARD_ROTATIONS,
   describeBoardRotation,
+  describePieceOrientation,
+  PIECE_ORIENTATION_MODES,
+  PieceOrientationMode,
   resolveBoardRotation,
 } from '../utils/boardOrientation';
 import { ChessPieceSvg, PIECE_NAMES } from './ChessPieceSvg';
@@ -81,6 +84,8 @@ export interface SharedHudProps {
   onRotateBoardCW?: () => void;
   onRotateBoardCCW?: () => void;
   onSetBoardRotation?: (rotation: BoardRotation) => void;
+  pieceOrientation?: PieceOrientationMode;
+  onChangePieceOrientation?: (mode: PieceOrientationMode) => void;
   onTogglePlayAsColor: (color: Color) => void;
   onToggleGameMode: (mode: GameMode) => void;
   onUndoMove: () => void;
@@ -329,6 +334,8 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
   onRotateBoardCW,
   onRotateBoardCCW,
   onSetBoardRotation,
+  pieceOrientation = 'facing',
+  onChangePieceOrientation,
   onTogglePlayAsColor,
   onToggleGameMode,
   onUndoMove,
@@ -1369,6 +1376,45 @@ export const TopHeaderBar: React.FC<SharedHudProps> = ({
                       </span>
                     </button>
                   </div>
+                  {onChangePieceOrientation && (
+                    <div className="pt-1.5 border-t border-[#1F2D25] space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-mono font-semibold text-[#A69F91] uppercase tracking-wider">
+                          Piece Orientation
+                        </span>
+                        <span className="text-[10px] font-mono text-[#C6923A]">
+                          {describePieceOrientation(pieceOrientation)}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        {PIECE_ORIENTATION_MODES.map((mode) => {
+                          const isActive = pieceOrientation === mode;
+                          const label =
+                            mode === 'facing'
+                              ? 'Facing'
+                              : mode === 'board'
+                              ? 'Board'
+                              : 'Upright';
+                          return (
+                            <button
+                              key={mode}
+                              type="button"
+                              data-testid={`options-piece-orient-${mode}`}
+                              aria-pressed={isActive}
+                              onClick={() => onChangePieceOrientation(mode)}
+                              className={`h-6 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
+                                isActive
+                                  ? 'bg-[#C6923A] border-[#C6923A] text-[#111815]'
+                                  : 'bg-[#1C2822] hover:bg-[#27362E] border-[#34463C] text-[#D6CFC2]'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {!ratedJourneyContext && (

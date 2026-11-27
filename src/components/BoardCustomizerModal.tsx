@@ -3,10 +3,15 @@ import { BoardRotation } from '../chess/types';
 import {
   BOARD_ROTATIONS,
   describeBoardRotation,
+  describePieceOrientation,
+  getPieceVisualRotation,
+  PIECE_ORIENTATION_MODES,
+  PieceOrientationMode,
   rotateBoardCCW,
   rotateBoardCW,
 } from '../utils/boardOrientation';
 import {
+  BOARD_THEMES,
   BOARD_THEME_LIST,
   BoardThemeId,
   CoordinateStyle,
@@ -16,6 +21,7 @@ import {
   MIN_COACH_WIDTH,
   UILayoutPreferences,
 } from '../utils/layoutMath';
+import { ChessPieceSvg } from './ChessPieceSvg';
 import {
   LayoutPanelLeft,
   Maximize2,
@@ -164,79 +170,205 @@ export const BoardCustomizerModal: React.FC<BoardCustomizerModalProps> = ({
             </div>
           </section>
 
-          {/* 1b. Board Angle & 90° Perspective Rotation */}
-          {onChangeBoardRotation && (
-            <section className="space-y-2.5 pt-4 border-t border-[#24332B]">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-[#EADBC8] flex items-center gap-1.5">
-                  <RotateCw className="w-3.5 h-3.5 text-[#C6923A]" />
-                  <span>Board Angle & Perspective</span>
-                </span>
-                <span className="text-xs font-mono text-[#C6923A] font-bold tabular-nums">
-                  {boardRotation}° · {describeBoardRotation(boardRotation)}
-                </span>
-              </div>
+          {/* 1b. Board Angle & Piece Orientation */}
+          <section className="space-y-2.5 pt-4 border-t border-[#24332B]">
+            {onChangeBoardRotation && (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-[#EADBC8] flex items-center gap-1.5">
+                    <RotateCw className="w-3.5 h-3.5 text-[#C6923A]" />
+                    <span>Board Angle & Perspective</span>
+                  </span>
+                  <span className="text-xs font-mono text-[#C6923A] font-bold tabular-nums">
+                    {boardRotation}° · {describeBoardRotation(boardRotation)}
+                  </span>
+                </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {BOARD_ROTATIONS.map((deg) => {
-                  const isSelected = boardRotation === deg;
-                  return (
-                    <button
-                      key={deg}
-                      type="button"
-                      data-testid={`customizer-angle-${deg}`}
-                      aria-pressed={isSelected}
-                      onClick={() => onChangeBoardRotation(deg)}
-                      className={`py-1.5 px-2 rounded-md text-[11px] font-semibold border transition-colors cursor-pointer text-center ${
-                        isSelected
-                          ? 'bg-[#C6923A] text-[#111815] border-[#C6923A] font-bold'
-                          : 'bg-[#121A16] hover:bg-[#1D2822] border-[#293830] text-[#D6CFC2]'
-                      }`}
-                    >
-                      <div className="font-mono tabular-nums">{deg}°</div>
-                      <div
-                        className={`text-[10px] leading-tight mt-0.5 ${
-                          isSelected ? 'text-[#111815]/80' : 'text-[#A69F91]'
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {BOARD_ROTATIONS.map((deg) => {
+                    const isSelected = boardRotation === deg;
+                    return (
+                      <button
+                        key={deg}
+                        type="button"
+                        data-testid={`customizer-angle-${deg}`}
+                        aria-pressed={isSelected}
+                        onClick={() => onChangeBoardRotation(deg)}
+                        className={`py-1.5 px-2 rounded-md text-[11px] font-semibold border transition-colors cursor-pointer text-center ${
+                          isSelected
+                            ? 'bg-[#C6923A] text-[#111815] border-[#C6923A] font-bold'
+                            : 'bg-[#121A16] hover:bg-[#1D2822] border-[#293830] text-[#D6CFC2]'
                         }`}
                       >
-                        {describeBoardRotation(deg)}
+                        <div className="font-mono tabular-nums">{deg}°</div>
+                        <div
+                          className={`text-[10px] leading-tight mt-0.5 ${
+                            isSelected ? 'text-[#111815]/80' : 'text-[#A69F91]'
+                          }`}
+                        >
+                          {describeBoardRotation(deg)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-[#A69F91]">
+                    Shortcuts: [T] Rotate +90° · [Shift+T] -90° · [F] Flip 180°
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      data-testid="customizer-rotate-ccw-btn"
+                      onClick={() =>
+                        onChangeBoardRotation(rotateBoardCCW(boardRotation))
+                      }
+                      className="px-2 py-1 rounded-md text-[11px] font-mono font-semibold bg-[#1D2822] hover:bg-[#27362E] border border-[#34463C] text-[#EADBC8] flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3 text-[#C6923A]" />
+                      <span>-90°</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="customizer-rotate-cw-btn"
+                      onClick={() =>
+                        onChangeBoardRotation(rotateBoardCW(boardRotation))
+                      }
+                      className="px-2 py-1 rounded-md text-[11px] font-mono font-semibold bg-[#1D2822] hover:bg-[#27362E] border border-[#34463C] text-[#EADBC8] flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <RotateCw className="w-3 h-3 text-[#C6923A]" />
+                      <span>+90°</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Piece Orientation Mode with Live Miniature Previews */}
+            <div
+              className={`space-y-2 ${
+                onChangeBoardRotation ? 'pt-3 border-t border-[#1F2D25]' : ''
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-[#EADBC8]">
+                  Piece Orientation
+                </span>
+                <span className="text-[11px] font-mono text-[#C6923A] font-semibold">
+                  {describePieceOrientation(preferences.pieceOrientation)}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {PIECE_ORIENTATION_MODES.map((mode) => {
+                  const isSelected = preferences.pieceOrientation === mode;
+                  const activeTheme =
+                    BOARD_THEMES[preferences.boardTheme] ?? BOARD_THEMES.mahogany;
+                  const meta =
+                    mode === 'facing'
+                      ? { title: 'Facing', subtitle: 'Face opponent' }
+                      : mode === 'board'
+                      ? { title: 'With Board', subtitle: 'Follows angle' }
+                      : { title: 'Upright', subtitle: 'Always 0°' };
+                  const whiteDeg = getPieceVisualRotation(
+                    'w',
+                    boardRotation,
+                    mode,
+                    'w'
+                  );
+                  const blackDeg = getPieceVisualRotation(
+                    'b',
+                    boardRotation,
+                    mode,
+                    'w'
+                  );
+                  const isSideways =
+                    boardRotation === 90 || boardRotation === 270;
+                  const firstIsWhite = boardRotation === 90 || boardRotation === 180;
+
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      data-testid={`customizer-piece-orient-${mode}`}
+                      aria-pressed={isSelected}
+                      onClick={() =>
+                        onChangePreferences({
+                          pieceOrientation: mode as PieceOrientationMode,
+                        })
+                      }
+                      className={`p-2 rounded-lg border transition-colors cursor-pointer flex flex-col items-center gap-1.5 text-center ${
+                        isSelected
+                          ? 'bg-[#1F2E26] border-[#C6923A] shadow-[0_0_0_1px_rgba(198,146,58,0.3)]'
+                          : 'bg-[#121A16] hover:bg-[#1A2520] border-[#293830] hover:border-[#3D5246]'
+                      }`}
+                    >
+                      {/* Live 2-Square Mini Piece Orientation Swatch */}
+                      <div
+                        className={`rounded border p-0.5 flex items-center justify-center ${
+                          isSideways ? 'flex-row' : 'flex-col'
+                        }`}
+                        style={{
+                          backgroundColor: activeTheme.frameBg,
+                          borderColor: activeTheme.frameBorder,
+                        }}
+                        aria-hidden="true"
+                      >
+                        {(firstIsWhite
+                          ? [
+                              { color: 'w' as const, deg: whiteDeg, light: true },
+                              { color: 'b' as const, deg: blackDeg, light: false },
+                            ]
+                          : [
+                              { color: 'b' as const, deg: blackDeg, light: true },
+                              { color: 'w' as const, deg: whiteDeg, light: false },
+                            ]
+                        ).map((cell) => (
+                          <div
+                            key={cell.color}
+                            className="w-6 h-6 flex items-center justify-center"
+                            style={{
+                              backgroundColor: cell.light
+                                ? activeTheme.lightSquare
+                                : activeTheme.darkSquare,
+                            }}
+                          >
+                            <div
+                              className="w-5 h-5 transition-transform duration-200"
+                              style={
+                                cell.deg !== 0
+                                  ? { transform: `rotate(${cell.deg}deg)` }
+                                  : undefined
+                              }
+                            >
+                              <ChessPieceSvg
+                                type="p"
+                                color={cell.color}
+                                shadow={false}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="min-w-0 w-full">
+                        <div
+                          className={`text-[11px] font-bold leading-tight ${
+                            isSelected ? 'text-[#F4EFE6]' : 'text-[#D6CFC2]'
+                          }`}
+                        >
+                          {meta.title}
+                        </div>
+                        <div className="text-[10px] text-[#A69F91] leading-tight mt-0.5 truncate">
+                          {meta.subtitle}
+                        </div>
                       </div>
                     </button>
                   );
                 })}
               </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] text-[#A69F91]">
-                  Shortcuts: [T] Rotate +90° · [Shift+T] -90° · [F] Flip 180°
-                </span>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    data-testid="customizer-rotate-ccw-btn"
-                    onClick={() =>
-                      onChangeBoardRotation(rotateBoardCCW(boardRotation))
-                    }
-                    className="px-2 py-1 rounded-md text-[11px] font-mono font-semibold bg-[#1D2822] hover:bg-[#27362E] border border-[#34463C] text-[#EADBC8] flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <RotateCcw className="w-3 h-3 text-[#C6923A]" />
-                    <span>-90°</span>
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="customizer-rotate-cw-btn"
-                    onClick={() =>
-                      onChangeBoardRotation(rotateBoardCW(boardRotation))
-                    }
-                    className="px-2 py-1 rounded-md text-[11px] font-mono font-semibold bg-[#1D2822] hover:bg-[#27362E] border border-[#34463C] text-[#EADBC8] flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <RotateCw className="w-3 h-3 text-[#C6923A]" />
-                    <span>+90°</span>
-                  </button>
-                </div>
-              </div>
-            </section>
-          )}
+            </div>
+          </section>
 
           {/* 2. Chessboard Scale & Auto-Fit */}
           <section className="space-y-2.5 pt-4 border-t border-[#24332B]">

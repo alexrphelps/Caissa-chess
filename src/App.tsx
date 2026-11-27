@@ -2556,6 +2556,10 @@ export default function App() {
         onRotateBoardCW={handleRotateBoardCW}
         onRotateBoardCCW={handleRotateBoardCCW}
         onSetBoardRotation={setBoardRotation}
+        pieceOrientation={uiPrefs.pieceOrientation}
+        onChangePieceOrientation={(mode) =>
+          updateUiPrefs({ pieceOrientation: mode })
+        }
         onTogglePlayAsColor={(nextColor) => {
           setPlayerColor(nextColor);
           startNewMatch(nextColor, gameMode);
@@ -2688,6 +2692,8 @@ export default function App() {
               maxFitSizePx={boardGeometry.maxFitSizePx}
               boardTheme={uiPrefs.boardTheme}
               coordinateStyle={uiPrefs.coordinateStyle}
+              pieceOrientation={uiPrefs.pieceOrientation}
+              perspectiveColor={playerColor}
               boardScale={uiPrefs.boardScale}
               isResizable={true}
               onBoardScaleChange={(nextScale) =>

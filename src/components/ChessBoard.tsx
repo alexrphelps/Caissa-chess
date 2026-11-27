@@ -12,6 +12,7 @@ import {
 } from '../chess/tacticsHelper';
 import {
   BoardRotation,
+  Color,
   GameState,
   Move,
   Piece,
@@ -23,6 +24,8 @@ import { ChessPieceSvg, PIECE_NAMES } from './ChessPieceSvg';
 import {
   describeBoardRotation,
   getBoardEdgeLabels,
+  getPieceVisualRotation,
+  PieceOrientationMode,
   resolveBoardRotation,
   squareToSvgCenterCoords,
   visualToBoardCoords,
@@ -67,6 +70,8 @@ interface ChessBoardProps {
   maxFitSizePx?: number;
   boardTheme?: BoardThemeId;
   coordinateStyle?: CoordinateStyle;
+  pieceOrientation?: PieceOrientationMode;
+  perspectiveColor?: Color;
   boardScale?: number;
   isResizable?: boolean;
   onBoardScaleChange?: (nextScale: number) => void;
@@ -153,6 +158,8 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   maxFitSizePx,
   boardTheme = 'mahogany',
   coordinateStyle = 'both',
+  pieceOrientation = 'facing',
+  perspectiveColor = 'w',
   boardScale = 1.0,
   isResizable = false,
   onBoardScaleChange,
@@ -606,6 +613,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
         data-board-theme={activeTheme.id}
         data-board-size={boardSizePx ?? undefined}
         data-board-rotation={effectiveRotation}
+        data-piece-orientation={pieceOrientation}
         className="relative p-2.5 sm:p-3 rounded-xl border-2 shadow-[0_16px_40px_rgba(0,0,0,0.65)] flex flex-col transition-colors duration-150"
         style={{
           backgroundColor: activeTheme.frameBg,
@@ -1007,34 +1015,55 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
                         </span>
                       )}
 
-                      {/* Chess Piece SVG with Smooth Slide Animation */}
-                      {piece && (
-                        <div
-                          key={`piece-${square}-${piece.color}-${piece.type}`}
-                          data-sliding={slideFromSquare ? 'true' : undefined}
-                          data-sliding-from={slideFromSquare ?? undefined}
-                          className={`relative z-10 w-[82%] h-[82%] pointer-events-none ${
-                            slideFromSquare
-                              ? 'piece-slide-anim'
-                              : 'transition-transform duration-150'
-                          } ${isSelected && !isHeldOrigin ? 'scale-105' : ''} ${
-                            isHeldOrigin ? 'opacity-40' : ''
-                          }`}
-                          style={
-                            slideOffset
-                              ? ({
-                                  '--slide-dx': `${slideOffset.dCol * 100}%`,
-                                  '--slide-dy': `${slideOffset.dRow * 100}%`,
-                                } as React.CSSProperties)
-                              : undefined
-                          }
-                        >
-                          <ChessPieceSvg
-                            type={piece.type}
-                            color={piece.color}
-                          />
-                        </div>
-                      )}
+                      {/* Chess Piece SVG with Smooth Slide Animation & Orientation Rotation */}
+                      {piece && (() => {
+                        const pieceRotationDeg = getPieceVisualRotation(
+                          piece.color,
+                          effectiveRotation,
+                          pieceOrientation,
+                          perspectiveColor
+                        );
+                        return (
+                          <div
+                            key={`piece-${square}-${piece.color}-${piece.type}`}
+                            data-sliding={slideFromSquare ? 'true' : undefined}
+                            data-sliding-from={slideFromSquare ?? undefined}
+                            data-piece-rotation={pieceRotationDeg}
+                            className={`relative z-10 w-[82%] h-[82%] pointer-events-none drop-shadow-[0_3px_3px_rgba(0,0,0,0.42)] ${
+                              slideFromSquare
+                                ? 'piece-slide-anim'
+                                : 'transition-transform duration-150'
+                            } ${isSelected && !isHeldOrigin ? 'scale-105' : ''} ${
+                              isHeldOrigin ? 'opacity-40' : ''
+                            }`}
+                            style={
+                              slideOffset
+                                ? ({
+                                    '--slide-dx': `${slideOffset.dCol * 100}%`,
+                                    '--slide-dy': `${slideOffset.dRow * 100}%`,
+                                  } as React.CSSProperties)
+                                : undefined
+                            }
+                          >
+                            <div
+                              className="w-full h-full transition-transform duration-200"
+                              style={
+                                pieceRotationDeg !== 0
+                                  ? {
+                                      transform: `rotate(${pieceRotationDeg}deg)`,
+                                    }
+                                  : undefined
+                              }
+                            >
+                              <ChessPieceSvg
+                                type={piece.type}
+                                color={piece.color}
+                                shadow={false}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Helper Mode: Destination Rank Badge (#1, #2, #3) */}
                       {recMoveOnTarget && !selectedSquare && (
@@ -1436,26 +1465,43 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
               })()}
 
             {/* Floating Ghost Piece while Left-Clicking & Holding a Piece */}
-            {heldPiece && (
-              <div
-                ref={ghostPieceRef}
-                data-testid="ghost-piece"
-                data-ghost-from={heldPiece.from}
-                className="absolute z-40 pointer-events-none w-[12.5%] h-[12.5%] flex items-center justify-center opacity-75 scale-110 drop-shadow-[0_10px_18px_rgba(0,0,0,0.65)]"
-                style={{
-                  left: `${heldPiece.startX}px`,
-                  top: `${heldPiece.startY}px`,
-                  transform: 'translate(-50%, -50%)',
-                }}
-              >
-                <div className="w-[86%] h-[86%]">
-                  <ChessPieceSvg
-                    type={heldPiece.piece.type}
-                    color={heldPiece.piece.color}
-                  />
+            {heldPiece && (() => {
+              const ghostRotationDeg = getPieceVisualRotation(
+                heldPiece.piece.color,
+                effectiveRotation,
+                pieceOrientation,
+                perspectiveColor
+              );
+              return (
+                <div
+                  ref={ghostPieceRef}
+                  data-testid="ghost-piece"
+                  data-ghost-from={heldPiece.from}
+                  data-piece-rotation={ghostRotationDeg}
+                  className="absolute z-40 pointer-events-none w-[12.5%] h-[12.5%] flex items-center justify-center opacity-75 scale-110 drop-shadow-[0_10px_18px_rgba(0,0,0,0.65)]"
+                  style={{
+                    left: `${heldPiece.startX}px`,
+                    top: `${heldPiece.startY}px`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  <div
+                    className="w-[86%] h-[86%]"
+                    style={
+                      ghostRotationDeg !== 0
+                        ? { transform: `rotate(${ghostRotationDeg}deg)` }
+                        : undefined
+                    }
+                  >
+                    <ChessPieceSvg
+                      type={heldPiece.piece.type}
+                      color={heldPiece.piece.color}
+                      shadow={false}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Right Coordinates (ranks at 0°/180°, files at 90°/270°) — Always height-synced with 8x8 grid */}
